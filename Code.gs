@@ -1,9 +1,9 @@
 function onOpen(e) {
   SpreadsheetApp.getUi()
       .createMenu('▼Mail Merge▼')
-      .addItem('☆ OPEN Mail Merge', 'showSidebar')
-      .addItem('☆ CLEAR Sheet', 'ClearSheet')
-      .addItem('☆ How to Use!', 'showManual')
+      .addItem('Open Mail Merge', 'showSidebar')
+      .addItem('Clear Sheet', 'clearSheet')
+      .addItem('How to Use!', 'showManual')
       .addToUi();
 }
 
@@ -26,7 +26,7 @@ function showManual() {
 }
 
 
-function ClearSheet() { // clear current sheet
+function clearSheet() { // clear current sheet
   var mySheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   if (mySheet.getName() != 'manual'){
     var response = Browser.msgBox('Caution!', 'Delete ' + mySheet.getName() + ' sheet contents?',Browser.Buttons.YES_NO);
