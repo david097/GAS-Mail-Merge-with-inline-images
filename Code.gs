@@ -28,14 +28,9 @@ function showManual() {
 
 function clearSheet() { // clear current sheet
   var mySheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  if (mySheet.getName() != 'manual'){
-    var response = Browser.msgBox('Caution!', 'Delete ' + mySheet.getName() + ' sheet contents?',Browser.Buttons.YES_NO);
-    if (response == 'yes') {
-      mySheet.getRange(2, 1, mySheet.getMaxRows() - 1, mySheet.getMaxColumns()).clearContent();
-    } 
-  } else {
-    Browser.msgBox('Alert!', 'Do not delete manual sheet!',Browser.Buttons.OK);
-    //throw new Error('Do not delete manual sheet!');
+  var response = Browser.msgBox('Caution!', 'Delete ' + mySheet.getName() + ' sheet contents?',Browser.Buttons.YES_NO);
+  if (response == 'yes') {
+    mySheet.getRange(2, 1, mySheet.getMaxRows() - 1, mySheet.getMaxColumns()).clearContent();
   } 
 }
 
