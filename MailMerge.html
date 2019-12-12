@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<!-- Made by David Sung -->
+<!-- 
+<refer css >
+css : https://developers.google.com/gsuite/add-ons/guides/css
+-->
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <style>
+    .branding-below {
+      bottom: 40px;
+      top: 0;
+    }
+    .branding-text {
+      left: 7px;
+      position: relative;
+      top: 3px;
+    }
+    .logo {
+      vertical-align: middle;
+    }
+    .width-100 {
+      width: 100%;
+      box-sizing: border-box;
+      -webkit-box-sizing: border-box;
+      -moz-box-sizing: border-box;
+    }
+    label {
+      color: gray;
+      /*font-size: 14px;*/
+    }
+    </style>
+    
+    <script>
+      // Prevent forms from submitting.
+      function preventFormSubmit() {
+        var forms = document.querySelectorAll('form');
+        for (var i = 0; i < forms.length; i++) {
+          forms[i].addEventListener('submit', function(event) {
+            event.preventDefault();
+          });
+        }
+      }
+      
+      window.addEventListener('load', preventFormSubmit);
+      
+      function handleFormSubmit(formObject) {
+        this.disabled = true;
+        $('#error').remove();
+        google.script.run
+            .withSuccessHandler(updateUrl)
+            .withFailureHandler(
+              function(msg, element) {
+                showError(msg, $('#toast'));
+                element.disabled = false;
+              })
+            .processForm(formObject);
+      }
+      
+      function updateUrl(url) {
+        var div = document.getElementById('output');
+        div.innerHTML = '<a href="' + url + '">Got it!</a>';
+      }
+      
+    </script>
+  </head>
+  
+  <body>
+
+    <div class="sidebar branding-below">
+      <form>
+        <div class="block">
+          <label for="draft">Templates in draft (latest 10)</label>
+          <select id="draft" name="draft" class="width-100">
+            <option selected>Select...</option>
+          </select>
+        </div>
+
+        <div class="block">
+          <label for="datasheet">Mail Merge Sheet</label>
+          <select id="datasheet" name="datasheet" class="width-100">
+            <option selected>Select...</option>
+          </select>
+        </div>
+        
+        <div class="block">
+          <label for="senderEmail">From</label>
+          <select id="senderEmail" name="senderEmail" class="width-100">
+            <option selected>Select...</option>
+          </select>
+        </div>
+        
+        <div class="block">
+          <label for="senderName">Sender's Name</label>
+          <input type="text" id="senderName" class="width-100">
+        </div>
+        
+        <!--
+        <div class="block">
+          <label for="ccEmail">CC Email</label>
+          <input type="text" id="ccEmail" class="width-100" placeholder="Optional">
+        </div>
+        -->
+
+        <div class="block">
+          <label for="bccEmail">BCC (Option)</label>
+          <input type="text" id="bccEmail" class="width-100" placeholder="Comma-seperated email address">
+        </div>
+
+        <div class="block">
+        <fieldset>
+          <legend><span><b>What would you like to do?</b></span></legend>
+            <div>
+              <input type="radio" id="test" name="radioTxt" value="test">
+              <label for="test">Send a Test email</label>
+            </div>
+            <div>
+              <input type="radio" id="run" name="radioTxt" value="run" checked>
+              <label for="run" class="current">Run Mail Merge</label>
+            </div>
+        </fieldset>
+        </div>
+
+        <div id="last" class="block">
+          <button type="submit" id="submitBtn" class="action">RUN</button>
+          <button type="reset" id="resetBtn">RESET</button>
+          <!--button type="button" id="resultBtn" class="current">RESULT</button-->
+        </div>        
+      </form>
+
+    </div>
+    
+    <div class="sidebar bottom">
+      <img alt="Add-on logo" class="logo"  width="24" height="24" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0%0D%0APSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij4KICAgIDxwYXRoIGQ9Ik0yLjAxIDIxTDIzIDEyIDIu%0D%0AMDEgMyAyIDEwbDE1IDItMTUgMnoiLz4KICAgIDxwYXRoIGQ9Ik0wIDBoMjR2MjRIMHoiIGZpbGw9%0D%0AIm5vbmUiLz4KPC9zdmc+Cg==">
+      <span class="gray branding-text">Mail Merge with inline images © David Sung 2020 <a href="https://mail.google.com/mail/?view=cm&fs=1&to=sungjoonyoung@gmail.com" target="_blank">Get in touch</a></span>
+    </div>
+
+    <script>
+     // Click Submit Button, run Mail Merge!
+      $('#submitBtn').click(function(event) {
+      
+       this.disabled = true;
+       $('#status').remove();
+       var draft = $( '#draft option:selected').text();
+       var sheetName = $( '#datasheet option:selected').text();
+       var senderEmail = $( '#senderEmail option:selected').text();
+       var senderName = $( '#senderName' ).val(); 
+       var ccEmail = ""; //var ccEmail = $( '#ccEmail' ).val().trim(); 
+       var bccEmail = $( '#bccEmail' ).val().trim(); 
+       var isTest = $('input[name="radioTxt"]:checked').val();
+
+        // Save the settings on the server
+        google.script.run
+            .withSuccessHandler(
+              function(msg, element) {
+              $("#submitBtn").attr("disabled", false);
+              showStatus('Done', $('#last'));
+              })
+            .withFailureHandler(
+              function(msg, element) {
+              $("#submitBtn").attr("disabled", false);
+              $("#status").text("Done");
+                showStatus(msg, $('#last'));
+                element.disabled = false;
+              })
+            .startMailMerge(draft, sheetName, senderEmail, senderName, ccEmail, bccEmail, isTest);
+            
+      });   
+     
+    // Replace the submit button text when click the radio button 
+    $("#test").click(function () {
+      $("#submitBtn").text("TEST");		
+    }); 
+    
+    $("#run").click(function () {
+      $("#submitBtn").text("RUN");		
+    });    
+    
+    // When Reset Button clicked, get Myname!
+      $('#resetBtn').click(function(event) {
+        $("#submitBtn").attr("disabled", false);
+        $("#submitBtn").text("RUN");
+        $('#status').remove();
+        google.script.run
+            .withSuccessHandler(
+              function(msg, element) {
+              buildDraftList(msg);
+              })
+            .withFailureHandler(
+              function(msg, element) {
+              showStatus(msg, $('#draft'));
+              element.disabled = false;
+              }) 
+        .getDraft();
+        
+        google.script.run
+            .withSuccessHandler(
+              function(msg, element) {
+              myName(msg);
+              })
+            .withFailureHandler(
+              function(msg, element) {
+              showStatus(msg, $('#senderName'));
+              element.disabled = false;
+              })     
+        .getMyName();
+      });
+
+    // Get my name (user name) automatically when page loads   
+      $(function () {
+        google.script.run
+            .withSuccessHandler(
+              function(msg, element) {
+              myName(msg);
+              })
+            .withFailureHandler(
+              function(msg, element) {
+              showStatus(msg, $('#senderName'));
+              element.disabled = false;
+              })     
+        .getMyName();
+      });
+
+    // Get Draft Email Template When Page Loads
+      $(function () {
+        google.script.run
+            .withSuccessHandler(
+              function(msg, element) {
+              buildDraftList(msg);
+              })
+            .withFailureHandler(
+              function(msg, element) {
+              showStatus(msg, $('#draft'));
+              element.disabled = false;
+              })        
+         .getDraft();
+      });
+      
+      // Get email account (alias) when page loads
+      $(function () {
+        google.script.run
+            .withSuccessHandler(
+              function(msg, element) {
+              buildsenderEmailList(msg);
+              })
+            .withFailureHandler(
+              function(msg, element) {
+              showStatus(msg, $('#senderEmail'));
+              element.disabled = false;
+              })
+        .getSenderEmail();
+      });
+      
+      // Get data sheet when page loads
+      $(function () {
+        google.script.run
+            .withSuccessHandler(
+              function(msg, element) {
+              buildDataSheetList(msg);
+              })
+            .withFailureHandler(
+              function(msg, element) {
+              showStatus(msg, $('#datasheet'));
+              element.disabled = false;
+              })        
+        .getDataSheet();
+      });
+
+
+
+    // Get my namefunction
+      function myName(myName) {
+        $('#senderName').val(myName);
+      }
+
+      // Draft email template parsing function 
+      function buildDraftList(returnVal) {
+        $('#draft').empty();
+        var newOptions = JSON.parse(returnVal);
+        var select = $('#draft');
+        $('option', select).remove();
+        $.each(newOptions, function(text, key) {
+          var option = new Option(key, text);
+          select.append($(option));
+        });
+      }
+      
+      // Email account (alias) parsing function
+      function buildsenderEmailList(returnVal) {
+        $('#senderEmail').empty();
+        var newOptions = JSON.parse(returnVal);
+        var select = $('#senderEmail');
+        $('option', select).remove();
+        $.each(newOptions, function(text, key) {
+          var option = new Option(key, text);
+          select.append($(option));
+        });
+      }
+      
+      // Datasheet Parsing Function
+      function buildDataSheetList(returnVal) {
+        $('#datasheet').empty();
+        var newOptions = JSON.parse(returnVal);
+        var select = $('#datasheet');
+        $('option', select).remove();
+        $.each(newOptions, function(text, key) {
+          var option = new Option(key, text);
+          select.append($(option));
+        });
+      } 
+    
+      /**
+       * Inserts a div that contains an status message after a given element.
+       *
+       * @param {String} msg The status message to display.
+       * @param {Object} element The element after which to display the Status.
+       */
+      function showStatus(msg, element) {
+         var div = $("<div style='padding-top:3px'>")
+             .attr('id', 'status')
+             .attr('class','error')
+             .text(msg);
+        $(element).after(div);
+      }    
+    </script> 
+  </body>
+</html>
