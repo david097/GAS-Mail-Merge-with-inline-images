@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>    
+    <!-- The CSS package above applies Google styling to buttons and other elements. -->
+    <style>
+    .branding-below {
+      bottom: 40px;
+      top: 0;
+    }
+    .branding-text {
+      left: 7px;
+      position: relative;
+      top: 3px;
+    }
+    .logo {
+      vertical-align: middle;
+    }
+    </style>    
+  </head>
+  <body>
+
+  <div class="block">
+    <p><b>We found no templates in Gmail Draft.</b><br/>
+    Please save a template as a draft message in your Gmail mailbox and re-run the Mail Merge program.<br/>
+    Create a draft in Gmail that will become the Merge template. Use {{placeholders}} in the message body and subject for fields that vary in each email message.
+    </p>
+
+    <p align='center'>
+    <button type="button" id="createDraft" class="action">Create Template</button>
+    <button type="button" id="done" class="create">I'm done</button>
+    </p>
+    
+  </div>
+  
+  
+  <script>
+  
+      // Get data logged user email when page loads
+      $("#createDraft").click(function () {
+        getLoggedEmail();
+      });
+
+      $("#done").click(function () {
+      google.script.run.showSidebar();
+      google.script.host.close();
+      });
+
+      function getLoggedEmail() {
+      var retVal = google.script.run
+          .withSuccessHandler(openEmail)
+          .withUserObject(this)
+          .getEmail();
+      }
+      
+      function openEmail(retVal) {
+        var msg;
+        if (retVal) {
+          msg = "https://accounts.google.com/AccountChooser?authuser=" + retVal + "&service=mail&Email=" + retVal + "&continue=https://mail.google.com/mail/#inbox?compose=new";
+        } else {
+          msg = "https://mail.google.com/mail/#inbox?compose=new";
+        }
+        window.open(msg);
+      }
+            
+  </script>
+    
+  </body>
+</html>
