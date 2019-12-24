@@ -34,13 +34,19 @@ function clearSheet() { // clear current sheet
   } 
 }
 
+function getEmail() {
+  return Session.getActiveUser().getEmail();
+}
+
 /*********************************************************************************************/
 function getDraft() { //get email template from gmail draft
   var draft = [];
-  var threads = GmailApp.search('in:draft', 0, 10);
-  
-  if (threads.length === 0) {
-    Browser.msgBox("We found no templates in Gmail. Please save a template as a draft message in your Gmail mailbox and re-run the Mail Merge program.");
+  var threads = GmailApp.search('in:draft', 0, 10);  
+  if (threads.length === 0) { //if there is no draft.
+    var html = HtmlService.createHtmlOutputFromFile('createDraft')
+          .setWidth(300)
+          .setHeight(200);
+    SpreadsheetApp.getUi().showModalDialog(html, 'Create Email Template');
     return;
   }
   
