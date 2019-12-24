@@ -14,7 +14,6 @@ How to Use GAS-Mail-Merge-with-inline-images?
 1. Open(reload) Spreadsheet you made.
 2. "▼Mail Merge▼ -> Open Mail Merge" menu click in Spreadsheet.
 3. The script is compatible with all browsers and only requires a Gmail account.
-
 4. Create Gmail Draft
 Create a draft in Gmail that will become the Merge template. Use {{placeholders}} in the message body and subject for fields that vary in each email message.
 
