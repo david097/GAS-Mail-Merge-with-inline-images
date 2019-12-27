@@ -130,11 +130,8 @@ function startMailMerge (draft, sheetName, senderEmail, senderName, ccEmail, bcc
   
   try
   { 
-  
-  // Check the Draft Start.
-  var draft = [];
-  var threads = GmailApp.search('in:draft', 0, 10);  
-  if (threads.length === 0) { //if there is no draft.
+  // Check the Draft Start. 
+  if (draft.length === 0) { //if there is no draft.
     var html = HtmlService.createHtmlOutputFromFile('createDraft')
           .setWidth(300)
           .setHeight(200);
@@ -142,7 +139,6 @@ function startMailMerge (draft, sheetName, senderEmail, senderName, ccEmail, bcc
     return;
   }
   // Check the Draft End.
-     
   
  var dateFormat = "MMMM dd, yyyy HH:mm:ss Z zz"; // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
  var ss = SpreadsheetApp.getActiveSpreadsheet();
