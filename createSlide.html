@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>    
+    <!-- The CSS package above applies Google styling to buttons and other elements. -->
+    <style>
+    .branding-below {
+      bottom: 40px;
+      top: 0;
+    }
+    .branding-text {
+      left: 7px;
+      position: relative;
+      top: 3px;
+    }
+    .logo {
+      vertical-align: middle;
+    }
+    </style>    
+  </head>
+  <body>
+
+  <div class="block">
+    <p><b>We found no google slides in your drive.</b><br/>
+    Please create a new slide and re-run the Mail Merge program.<br/>
+    In new slide, Use {{placeholders}} in the text for fields that vary in each.
+    In draft in Gmail, Use {{slideimage}} in the message body.
+    </p>
+
+    <p align='center'>
+    <button type="button" id="createSlide" class="action">Create New Slide</button>
+    <button type="button" id="done" class="create">I'm done</button>
+    </p>
+    
+  </div>
+  
+  
+  <script>
+  
+      // Get data logged user email when page loads
+      $("#createSlide").click(function () {
+        createSlide();
+      });
+
+      $("#done").click(function () {
+      google.script.run.showSidebar();
+      google.script.host.close();
+      });
+
+      function createSlide() {
+      var retVal = google.script.run
+          .withSuccessHandler(openSlide)
+          .withUserObject(this)
+          .createSlide();
+      }
+      
+      function openSlide(retVal) {
+        var msg;
+        if (retVal) {
+          msg = "https://accounts.google.com/AccountChooser?authuser=" + retVal.email + "&service=mail&Email=" + retVal.email + "&continue=" +  retVal.url;
+        } else {
+          msg = retVal.url;
+        }
+        window.open(msg);
+      }
+            
+  </script>
+  
+  </body>
+</html>
