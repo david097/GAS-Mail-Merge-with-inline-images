@@ -365,7 +365,7 @@ function fillInTemplateFromObject(template, data, withSlide) {
    // If no value is available, replace with the empty string.
    for (var i = 0; i < templateVars.length; ++i) {
      // normalizeHeader ignores ${"} so we can call it directly here.
-     Logger.log(normalizeHeader(templateVars[i]));
+     Logger.log("templateVars : " + normalizeHeader(templateVars[i]));
 
      if (normalizeHeader(templateVars[i]) == "slideimage" && withSlide == true) {
      var variableData = "<img data-surl='cid:slideImage' src='cid:slideImage' alt='fromSlideImage'></br>";
@@ -447,7 +447,7 @@ function normalizeHeader(header) {
 }
 
 function isCellEmpty(cellData) {
- return typeof(cellData) == "string" && cellData == "";
+ return typeof(cellData) == "string" && cellData == " ";
 }
 
 function isAlnum(char) {
@@ -493,10 +493,12 @@ function rangeToObjects(range){
       var templateSlide = slides.getSlides()[0]; // assume first slide is our template
       var newSlide = templateSlide.duplicate(); // copy the first slide
       // iterate across the data and replace any placeholder with our data
-      for (var r in row) {
-        
-        var variableData = row[normalizeHeader('{{'+r+'}}')];        
+      for (var r in row) {  
+        var variableData = row[normalizeHeader('{{'+r+'}}')];
+        Logger.log("r : " + r);  
+        Logger.log("variableData : " + variableData);
         newSlide.replaceAllText('{{'+r+'}}', variableData || "");
+
       }
       
       // force changes to be saved
