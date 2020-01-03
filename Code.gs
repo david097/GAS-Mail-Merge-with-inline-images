@@ -39,6 +39,42 @@ function getEmail() {
 }
 
 /*********************************************************************************************/
+function getSlides() {
+  var i = 0;
+  var results = [];
+  var listName = [];
+  var listUrl = [];
+  var type = [MimeType.GOOGLE_SLIDES];
+  var files = DriveApp.getFilesByType(type);
+  
+  if (!files.hasNext()) { //if there is no draft.
+    var html = HtmlService.createHtmlOutputFromFile('createSlide')
+          .setWidth(300)
+          .setHeight(200);
+    SpreadsheetApp.getUi().showModalDialog(html, 'Create New Slide');
+    return false;
+  }  
+  
+    while (files.hasNext() && i<20) { // latest 20 slides
+        var file = files.next();
+        listName.push(file.getName());
+        listUrl.push(file.getUrl());
+        i++;
+    }
+
+  
+  results = [listName, listUrl]; 
+  var returnVal = rangeToObjects(results)[0];
+  return JSON.stringify(returnVal);
+}
+
+function createSlide (){
+  var newSlide = SlidesApp.create("New slide for mail merge - " + new Date()); 
+  return {url : newSlide.getUrl(),
+          email : getEmail()};
+}
+
+/*********************************************************************************************/
 function getDraft() { //get email template from gmail draft
   var draft = [];
   var threads = GmailApp.search('in:draft', 0, 10);  
@@ -126,7 +162,7 @@ function getMyName () { //get User Name from Owername of createed Drive file.
 
 
 /*********************************************************************************************/
-function startMailMerge (draft, sheetName, senderEmail, senderName, ccEmail, bccEmail, isTest) {
+function startMailMerge (draft, sheetName, senderEmail, senderName, ccEmail, bccEmail, isTest, withSlide, slideUrl) {
   
   try
   { 
@@ -150,13 +186,13 @@ function startMailMerge (draft, sheetName, senderEmail, senderName, ccEmail, bcc
  var headers = dataSheet.getRange(1, 1, 1, dataSheet.getLastColumn()).getValues();
  var emailColumnFound = false;
  for(i in headers[0]){
-   if(headers[0][i] == "Email Address"){
+   if(headers[0][i] == "Email"){
      emailColumnFound = true;
    }
  }
  if(!emailColumnFound){
    var emailColumn = Browser.inputBox("Which column contains the recipient's email address ? (A, B,...)");
-   dataSheet.getRange(emailColumn+''+1).setValue("Email Address");
+   dataSheet.getRange(emailColumn+''+1).setValue("Email");
  }
   
  if (isTest != "test") { // if not test
@@ -172,14 +208,14 @@ function startMailMerge (draft, sheetName, senderEmail, senderName, ccEmail, bcc
  var bcc = bccEmail;
  var selectedAliases = senderName;
  var isTest = isTest;
-
+    
 // Send with inline images by David Sung
  var pattern = /<img.*src="([^"]*)"[^>]*>/; //pattern for img tag
  var matches = pattern.exec(emailTemplate);
 
-
- if(emailTemplate.search(/<\img/) != -1){
    var inlineImages = {}; // define the inlineImages
+ if(emailTemplate.search(/<\img/) != -1){
+
    var imgVars = emailTemplate.match(/<img[^>]+>/g); // find img tags
    
    for(i in imgVars){
@@ -232,8 +268,19 @@ function startMailMerge (draft, sheetName, senderEmail, senderName, ccEmail, bcc
     
    var rowData = objects[0];
    var UserEmail = Session.getActiveUser().getEmail(); 
-   var emailText = fillInTemplateFromObject(emailTemplate, rowData); 
-   var emailSubject = fillInTemplateFromObject(selectedTemplate.getSubject(), rowData);
+   var emailText = fillInTemplateFromObject(emailTemplate, rowData, withSlide); 
+   var emailSubject = fillInTemplateFromObject(selectedTemplate.getSubject(), rowData, withSlide);
+    
+     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    Logger.log("withSlide : " + withSlide);
+     if (withSlide == true) {
+     Logger.log("slideUrl : " + slideUrl);  
+     var slides = SlidesApp.openByUrl(slideUrl);
+     var slideImageBlob = fillInSlideFromObject_(slides.getId(), rowData);
+     inlineImages["slideImage"] = slideImageBlob.blob.setName("slideImage");
+     }
+     ////////////////////////////////////////////////////////////////////////////////////////////////////////////    
+    
   var message = {
     htmlBody: emailText,
     subject: "[TEST] " + emailSubject,
@@ -261,19 +308,26 @@ function startMailMerge (draft, sheetName, senderEmail, senderName, ccEmail, bcc
      // Replace markers (for instance {{"First Name"}}) with the 
      // corresponding value in a row object (for instance rowData.firstName).
      
-     var emailText = fillInTemplateFromObject(emailTemplate, rowData);     
-     var emailSubject = fillInTemplateFromObject(selectedTemplate.getSubject(), rowData);
+     var emailText = fillInTemplateFromObject(emailTemplate, rowData, withSlide);     
+     var emailSubject = fillInTemplateFromObject(selectedTemplate.getSubject(), rowData, withSlide);
+     
+     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+     if (withSlide == true) {
+     var slides = SlidesApp.openByUrl(slideUrl);
+     var slideImageBlob = fillInSlideFromObject_(slides.getId(), rowData);
+     inlineImages["slideImage"] = slideImageBlob.blob.setName("slideImage");
+     }
+     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
          
-     GmailApp.sendEmail(rowData.emailAddress, emailSubject, null,
-                        {name: senderName, attachments: attachments, htmlBody: emailText, cc: cc, bcc: bcc, inlineImages:inlineImages, from : senderEmail});      
+     MailApp.sendEmail(rowData.email, emailSubject, null,
+                        {name: senderName, attachments: attachments, htmlBody: emailText, cc: cc, bcc: bcc, inlineImages:inlineImages, from : senderEmail});
 
      dataSheet.getRange(i+2,dataSheet.getLastColumn()).setValue("EMAIL_SENT");
-     output.append ("<span style='color:blue'>Success</span> : " + rowData.emailAddress + " <br/>");
-     
+     output.append ("<span style='color:blue'>Success</span> : " + rowData.email + " <br/>");
      
    } else {
-     output.append ("<span style='color:red'>Error</span> : " + rowData.emailAddress + ", <span style='color:gray'>Please empty the 'Mail Merge Status' cell.</span><br/>");
-     //ss.toast(rowData.emailAddress + "\'s Mail Merge Status is EMAIL_SENT", "", 3);
+     output.append ("<span style='color:red'>Error</span> : " + rowData.email + ", <span style='color:gray'>Please empty the 'Mail Merge Status' cell.</span><br/>");
+     //ss.toast(rowData.email + "\'s Mail Merge Status is EMAIL_SENT", "", 3);
    }
    
  }
@@ -303,19 +357,23 @@ function startMailMerge (draft, sheetName, senderEmail, senderName, ccEmail, bcc
 //           data.columnName will replace marker {{Column name}}
 // Returns a string without markers. If no data is found to replace a marker, it is
 // simply removed.
-function fillInTemplateFromObject(template, data) {
- var email = template;
-  
- //     https://developers.google.com/apps-script/articles/mail_merge
- //     template.match(/   \$\{\"      [^\"]+  \"  \}/g);   =>  ${"   First Name   "}
-  var templateVars = template.match(/\{\{[^\{]+\}\}/g); //(/\$\%[^\%]+\%/g)
- if(templateVars!= null){          
+function fillInTemplateFromObject(template, data, withSlide) {
+ var email = template;  
+ var templateVars = template.match(/\{\{[^\{]+\}\}/g); //(/\$\%[^\%]+\%/g)
+ if(templateVars!= null){
    // Replace variables from the template with the actual values from the data object.
    // If no value is available, replace with the empty string.
    for (var i = 0; i < templateVars.length; ++i) {
      // normalizeHeader ignores ${"} so we can call it directly here.
+     Logger.log(normalizeHeader(templateVars[i]));
+
+     if (normalizeHeader(templateVars[i]) == "slideimage" && withSlide == true) {
+     var variableData = "<img data-surl='cid:slideImage' src='cid:slideImage' alt='fromSlideImage'></br>";
+     email = email.replace(templateVars[i], variableData || "");
+     } else {
      var variableData = data[normalizeHeader(templateVars[i])];
      email = email.replace(templateVars[i], variableData || "");
+     }
    }
  }
  return email;
@@ -401,3 +459,58 @@ function isAlnum(char) {
 function isDigit(char) {
  return char >= '0' && char <= '9';
 }
+
+/**
+ * Changes a range array often returned from .getValues() into an 
+ * array of objects with key value pairs.
+ * The first element in the array is used as the keys (headers)
+ *
+ * @param   {Array}   range   [[key, key, ...],[value, value, ...]] 
+ * @returns {Array}           [{key:value, ...}, ...] 
+ */
+function rangeToObjects(range){
+  var headers = range[0];
+  var values = range;
+  var rowObjects = [];
+  for (var i = 1; i < values.length; ++i) {
+    var row = new Object();
+    //row.rowNum = i;
+    for (var j in headers){
+      //row[camelString(headers[j])] = values[i][j];
+      row[headers[j]] = values[i][j];
+    }
+   rowObjects.push(row); 
+  }
+  return rowObjects;
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
+    function fillInSlideFromObject_(slides_id, row){
+      var slides = SlidesApp.openById(slides_id);
+      var templateSlide = slides.getSlides()[0]; // assume first slide is our template
+      var newSlide = templateSlide.duplicate(); // copy the first slide
+      // iterate across the data and replace any placeholder with our data
+      for (var r in row) {
+        
+        var variableData = row[normalizeHeader('{{'+r+'}}')];        
+        newSlide.replaceAllText('{{'+r+'}}', variableData || "");
+      }
+      
+      // force changes to be saved
+      // https://developers.google.com/apps-script/guides/slides/lifecycle#modifying_a_presentation
+      slides.saveAndClose();
+      
+      // get slide image as a thumbnail (only PNG currently supported)
+      var thumbnail = Slides.Presentations.Pages.getThumbnail(slides_id, newSlide.getObjectId(), {
+        'thumbnailProperties.thumbnailSize': 'MEDIUM'
+      });
+      // from returned contentUrl fetch the image as a blob (contentUrl's only last 30 minutes)
+      var blob = UrlFetchApp.fetch(thumbnail.contentUrl).getBlob();
+      return { blob: blob,
+              slides_id: newSlide.getObjectId()};  
+    } 
+////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////
