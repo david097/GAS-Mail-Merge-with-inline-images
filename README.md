@@ -8,8 +8,7 @@ How to Use GAS-Mail-Merge-with-inline-images?
 [Install]
 
 1. Copy this SpreadSheet on your Google Drive!
-
-https://docs.google.com/spreadsheets/d/1Q1C58AiZP-FGIE9f8R8t_D256GgbxL9b04Lhss0Bo_M/edit?usp=sharing
+https://bit.ly/2ZJmLwL
 
 [Use]
 
