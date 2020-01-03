@@ -62,7 +62,7 @@
         if (retVal) {
           msg = "https://accounts.google.com/AccountChooser?authuser=" + retVal.email + "&service=mail&Email=" + retVal.email + "&continue=" +  retVal.url;
         } else {
-          msg = retVal.url;
+          msg = "https://docs.google.com/presentation";
         }
         window.open(msg);
       }
