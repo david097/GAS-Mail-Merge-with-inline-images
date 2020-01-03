@@ -29,6 +29,13 @@ css : https://developers.google.com/gsuite/add-ons/guides/css
       -webkit-box-sizing: border-box;
       -moz-box-sizing: border-box;
     }
+    .width-90 {
+      width: 90%;
+      box-sizing: border-box;
+      -webkit-box-sizing: border-box;
+      -moz-box-sizing: border-box;
+    }  
+
     label {
       color: gray;
       /*font-size: 14px;*/
@@ -47,7 +54,7 @@ css : https://developers.google.com/gsuite/add-ons/guides/css
       }
       
       window.addEventListener('load', preventFormSubmit);
-      
+      /*
       function handleFormSubmit(formObject) {
         this.disabled = true;
         $('#error').remove();
@@ -65,6 +72,7 @@ css : https://developers.google.com/gsuite/add-ons/guides/css
         var div = document.getElementById('output');
         div.innerHTML = '<a href="' + url + '">Got it!</a>';
       }
+      */
       
     </script>
   </head>
@@ -112,6 +120,17 @@ css : https://developers.google.com/gsuite/add-ons/guides/css
         </div>
 
         <div class="block">
+          <label for="slideimage">with silde image? {{SlideImage}}</label>
+          <input type="checkbox" id="slideimage">
+          <select id="slide" name="slide" class="width-90">
+            <option selected>Select...</option>
+          </select>
+          <img id="slideOpenBtn" style="width:16px;height:16px" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiA/PjwhRE9DVFlQRSBzdmcgIFBVQkxJQyAnLS8vVzNDLy9EVEQgU1ZHIDEuMS8vRU4nICAnaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkJz48c3ZnIGVuYWJsZS1iYWNrZ3JvdW5kPSJuZXcgMCAwIDUwIDUwIiBoZWlnaHQ9IjUwcHgiIGlkPSJMYXllcl8xIiB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCA1MCA1MCIgd2lkdGg9IjUwcHgiIHhtbDpzcGFjZT0icHJlc2VydmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiPjxyZWN0IGZpbGw9Im5vbmUiIGhlaWdodD0iNTAiIHdpZHRoPSI1MCIvPjxwYXRoIGQ9Ik00NiwxNXYtNCAgYzAtMS4xMDQtMC44OTYtMi0yLTJjMCwwLTI0LjY0OCwwLTI2LDBjLTEuNDY5LDAtMi40ODQtNC00LTRIM0MxLjg5Niw1LDEsNS44OTYsMSw3djR2Mjl2NGMwLDEuMTA0LDAuODk2LDIsMiwyaDM5ICBjMS4xMDQsMCwyLTAuODk2LDItMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwMDAwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1taXRlcmxpbWl0PSIxMCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTEsNDRsNS0yNyAgYzAtMS4xMDQsMC44OTYtMiwyLTJoMzljMS4xMDQsMCwyLDAuODk2LDIsMmwtNSwyNyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwMDAwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1taXRlcmxpbWl0PSIxMCIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+"/>          
+        </div>
+
+
+
+        <div class="block">
         <fieldset>
           <legend><span><b>What would you like to do?</b></span></legend>
             <div>
@@ -140,6 +159,28 @@ css : https://developers.google.com/gsuite/add-ons/guides/css
     </div>
 
     <script>
+      // Click with Slide Image!
+      $("#slide").hide();
+      $("#slideOpenBtn").hide();
+        $('input[id="slideimage"]').click(function(){
+            if($(this).prop("checked") == true){
+                isSlide();
+                $("#slide").show();
+                $("#slideOpenBtn").show();
+                
+                
+            }
+            else if($(this).prop("checked") == false){
+                $("#slide").hide();
+                $("#slideOpenBtn").hide();
+            }
+        });
+
+      $("#slideOpenBtn").click(function () {
+        window.open($("#slide  option:selected").val());
+      });
+      
+    
      // Click Submit Button, run Mail Merge!
       $('#submitBtn').click(function(event) {
       
@@ -152,8 +193,10 @@ css : https://developers.google.com/gsuite/add-ons/guides/css
        var ccEmail = ""; //var ccEmail = $( '#ccEmail' ).val().trim(); 
        var bccEmail = $( '#bccEmail' ).val().trim(); 
        var isTest = $('input[name="radioTxt"]:checked').val();
-
-        // Save the settings on the server
+       var withSlide = $('input[id="slideimage"]').prop("checked");
+       var slideUrl =  $("#slide  option:selected").val();
+       
+        
         google.script.run
             .withSuccessHandler(
               function(msg, element) {
@@ -167,7 +210,7 @@ css : https://developers.google.com/gsuite/add-ons/guides/css
                 showStatus(msg, $('#last'));
                 element.disabled = false;
               })
-            .startMailMerge(draft, sheetName, senderEmail, senderName, ccEmail, bccEmail, isTest);
+            .startMailMerge(draft, sheetName, senderEmail, senderName, ccEmail, bccEmail, isTest, withSlide, slideUrl);
             
       });   
      
@@ -208,7 +251,28 @@ css : https://developers.google.com/gsuite/add-ons/guides/css
               element.disabled = false;
               })     
         .getMyName();
+        $("#slide").hide();
+        $("#slideOpenBtn").hide();
       });
+
+
+
+    // Get Slide File lists automatically when page loads   
+    function isSlide(){
+        google.script.run
+            .withSuccessHandler(
+              function(msg, element) {
+              mySlides(msg);
+              })
+            .withFailureHandler(
+              function(msg, element) {
+              showStatus(msg, $('#slide'));
+              element.disabled = false;
+              })     
+        .getSlides();
+    }
+
+
 
     // Get my name (user name) automatically when page loads   
       $(function () {
@@ -276,6 +340,19 @@ css : https://developers.google.com/gsuite/add-ons/guides/css
       function myName(myName) {
         $('#senderName').val(myName);
       }
+      
+      
+      // My Slides parsing function 
+      function mySlides(returnVal) {
+        $('#slide').empty();
+        var newOptions = JSON.parse(returnVal);
+        var select = $('#slide');
+        $('option', select).remove();
+        $.each(newOptions, function(text, key) {
+          var option = new Option(text, key);
+          select.append($(option));
+        });
+      }      
 
       // Draft email template parsing function 
       function buildDraftList(returnVal) {
