@@ -156,7 +156,17 @@ function runMailMerge_(opts) {
     PropertiesService.getUserProperties().setProperty(CONFIG.PROP_SENDER_NAME, opts.senderName);
   }
 
-  const slideId = opts.slideUrl ? SlidesApp.openByUrl(opts.slideUrl).getId() : null;
+  // 발송 전에 API 사용 가능 여부를 한 번만 확인 → 꺼져 있으면 행마다 실패 기록하지 않고 바로 안내
+  checkApi_('Gmail', () => Gmail.Users.getProfile('me'));
+
+  let slideId = opts.slideUrl ? SlidesApp.openByUrl(opts.slideUrl).getId() : null;
+  if (slideId && !template.usesSlideImage) slideId = null; // 본문에 {{SlideImage}}가 없으면 슬라이드 작업 생략
+  if (slideId) {
+    if (typeof Slides === 'undefined') {
+      throw new Error('Google Slides API 서비스가 추가되지 않았습니다. Apps Script 편집기 > 서비스(+) > Google Slides API 를 추가해 주세요.');
+    }
+    checkApi_('Google Slides', () => Slides.Presentations.get(slideId, { fields: 'presentationId' }));
+  }
   const log = [];
   const summary = { sent: 0, skipped: 0, failed: 0, remaining: 0, stoppedEarly: false, missingFields: [] };
   const missing = {};
@@ -651,6 +661,25 @@ function getDefaultSenderName_(senders) {
 /* ======================================================================
  * 유틸
  * ====================================================================== */
+
+/**
+ * API 호출을 시험해 보고, "API가 꺼져 있음" 오류면 알아보기 쉬운 한글 안내로 바꿔서 던진다.
+ * (스크립트가 '표준 Google Cloud 프로젝트'에 연결되어 있으면 Cloud Console에서 API를 직접 켜야 함)
+ */
+function checkApi_(apiName, fn) {
+  try {
+    fn();
+  } catch (e) {
+    const msg = String(e.message || e);
+    if (/has not been used in project|is disabled|SERVICE_DISABLED|accessNotConfigured/i.test(msg)) {
+      const url = (msg.match(/https:\/\/console\.(?:developers|cloud)\.google\.com\/\S+/) || [''])[0].replace(/[.,)]+$/, '');
+      throw new Error(
+        `${apiName} API가 꺼져 있습니다. 아래 주소에서 [사용(ENABLE)]을 누른 뒤 1~2분 후 다시 시도하세요.\n${url}`
+      );
+    }
+    throw e;
+  }
+}
 
 function parseAddressList_(text, label) {
   const list = String(text || '').split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
