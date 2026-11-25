@@ -19,7 +19,7 @@ Send personalised emails to everyone in a Google Sheet, using a Gmail draft as t
 
 ### Option A — copy the sample spreadsheet
 
-1. Open the [sample spreadsheet](https://bit.ly/2ZJmLwL) and choose **File → Make a copy**.
+1. Open the [sample spreadsheet](https://docs.google.com/spreadsheets/d/1Q1C58AiZP-FGIE9f8R8t_D256GgbxL9b04Lhss0Bo_M/copy) and click **Make a copy**.
 2. Open your copy and reload it. A **▼Mail Merge▼** menu appears.
 3. The first time you run it, Google asks for authorisation. If you see "Google hasn't verified this app", click **Advanced → Go to (project name)**. The script runs only in your account.
 
