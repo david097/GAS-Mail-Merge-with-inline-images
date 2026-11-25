@@ -1,75 +1,82 @@
 /**
- * Mail Merge with inline images — 2026 정리판
- * Original © David Sung (2019~2023), 2023-11-15 버전 기준으로 정리
+ * Mail Merge with inline images — 2026 edition
+ * © David Sung (2019–2026) · https://github.com/david097/GAS-Mail-Merge-with-inline-images
  *
- * 주요 변경
- *  - 발송을 GmailApp.sendEmail → Gmail API(raw MIME)로 변경
- *    · GmailApp 은 이모지(4바이트 문자)를 깨뜨리고, MailApp 은 보내는 주소(from) 지정이 안 됨
- *    · Gmail API 는 둘 다 해결 (보내는 주소 별칭 + 이모지 모두 정상)
- *  - 빈 행이 있으면 상태(EMAIL_SENT)가 엉뚱한 행에 기록되던 버그 수정
- *  - 한글 헤더({{이름}}) 지원, 헤더가 비어 있거나 한글이면 필드가 한 칸씩 밀리던 버그 수정
- *  - 초안 선택을 "목록 순번"이 아닌 "초안 ID"로 변경 (다른 초안이 발송되는 문제 방지)
- *  - 한 행 실패해도 전체가 멈추지 않고, 실패 사유를 상태 열에 기록
- *  - 6분 실행 제한 전에 안전하게 멈추고, 다시 실행하면 이어서 발송
- *  - 슬라이드 이미지 사용 시 원본 슬라이드에 복사본이 계속 쌓이던 문제 수정
- *  - 쓰지 않던 함수/파일 정리, 'Mail Merge.txt' 생성 꼼수 제거
+ * Sends personalised emails from a Gmail draft to every row of a Google Sheet.
+ *  - Messages are built as raw MIME and sent through the Gmail API, so emoji (4-byte characters)
+ *    in the subject, body and sender name survive, and Gmail "Send mail as" aliases work.
+ *  - Inline images and attachments in the draft are preserved.
+ *  - Optional: a Google Slides page rendered per recipient and embedded with {{SlideImage}}.
+ *  - UI text is localised (see i18n.gs and Lang_*.gs).
  *
- * 필수 설정: Apps Script 편집기 > 서비스(+) > "Gmail API" 추가
- *           (슬라이드 이미지 기능을 쓰면 "Google Slides API"도 추가)
+ * Required: Apps Script editor > Services (+) > Gmail API
+ *           (and Google Slides API if you use the slide image feature).
+ *           Both are already declared in appsscript.json.
  */
 
 const CONFIG = {
   MENU_NAME: '▼Mail Merge▼',
-  STATUS_HEADER: 'Mail Merge Status',
+  STATUS_HEADER: 'Mail Merge Status', // kept in English for compatibility with existing sheets
   STATUS_SENT: 'EMAIL_SENT',
-  // 이메일 열로 인식할 헤더 (소문자, 공백/기호 제거 후 비교)
+  // Headers recognised as the email column (compared after lower-casing and removing spaces/symbols)
   EMAIL_HEADERS: ['email', 'emailaddress', 'mail', 'mailaddress', '이메일', '이메일주소', '메일', '메일주소'],
   MAX_DRAFTS: 20,
   MAX_SLIDES: 20,
-  TIME_LIMIT_MS: 5 * 60 * 1000, // Apps Script 6분 제한 전에 멈춤
+  TIME_LIMIT_MS: 5 * 60 * 1000, // stop safely before Apps Script's 6-minute execution limit
   SLIDE_CID: 'mm_slide_image',
   PROP_SENDER_NAME: 'mm_sender_name',
 };
 
 /* ======================================================================
- * 메뉴 / 화면
+ * Menu / dialogs
  * ====================================================================== */
 
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu(CONFIG.MENU_NAME)
-    .addItem('메일머지 열기', 'showSidebar')
-    .addItem('현재 시트 내용 지우기', 'clearSheet')
+    .addItem(t('menu_open'), 'showSidebar')
+    .addItem(t('menu_clear'), 'clearSheet')
     .addSeparator()
-    .addItem('사용법', 'showManual')
+    .addItem(t('menu_manual'), 'showManual')
     .addToUi();
 }
 
 function showSidebar() {
-  const html = HtmlService.createHtmlOutputFromFile('MailMerge').setTitle('Mail Merge');
+  const lang = getLang_();
+  const tpl = HtmlService.createTemplateFromFile('MailMerge');
+  tpl.lang = lang;
+  tpl.s = getStrings_(lang);
+  tpl.languages = getLanguages_();
+  const html = tpl.evaluate().setTitle(t('sidebar_title'));
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
+/** Shows Manual_<lang>.html, falling back to the English manual. */
 function showManual() {
-  const html = HtmlService.createHtmlOutputFromFile('UserManual').setWidth(560).setHeight(520);
-  SpreadsheetApp.getUi().showModalDialog(html, 'Mail Merge 사용법');
+  let html;
+  try {
+    html = HtmlService.createHtmlOutputFromFile('Manual_' + getLang_());
+  } catch (e) {
+    html = HtmlService.createHtmlOutputFromFile('Manual_' + I18N.DEFAULT_LANG);
+  }
+  SpreadsheetApp.getUi().showModalDialog(html.setWidth(580).setHeight(540), t('manual_title'));
 }
 
-/** 현재 시트에서 머리행(1행)을 제외한 내용을 지움 */
+/** Clears everything below the header row of the active sheet. */
 function clearSheet() {
   const ui = SpreadsheetApp.getUi();
   const sheet = SpreadsheetApp.getActiveSheet();
-  const answer = ui.alert('주의', `'${sheet.getName()}' 시트의 내용(1행 제외)을 모두 지울까요?`, ui.ButtonSet.YES_NO);
+  const answer = ui.alert(t('clear_title'), t('clear_confirm', { sheet: sheet.getName() }), ui.ButtonSet.YES_NO);
   if (answer !== ui.Button.YES) return;
   const rows = sheet.getMaxRows() - 1;
   if (rows > 0) sheet.getRange(2, 1, rows, sheet.getMaxColumns()).clearContent();
 }
 
 /* ======================================================================
- * 사이드바에서 호출하는 함수 (google.script.run)
+ * Functions called from the sidebar (google.script.run)
  * ====================================================================== */
 
-/** 사이드바를 여는 데 필요한 정보를 한 번에 반환 */
+/** Everything the sidebar needs, in a single round trip. */
 function getSidebarData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const senders = listSenders_();
@@ -79,7 +86,6 @@ function getSidebarData() {
     sheets: ss.getSheets().map(s => s.getName()),
     activeSheet: ss.getActiveSheet().getName(),
     senderName: getDefaultSenderName_(senders),
-    me: Session.getActiveUser().getEmail(),
   };
 }
 
@@ -87,7 +93,13 @@ function getDrafts() {
   return listDrafts_();
 }
 
-/** 내 드라이브의 Google Slides 목록 */
+/** Saves the chosen language and reopens the sidebar in that language. */
+function changeLanguage(code) {
+  setLanguage(code);
+  showSidebar();
+}
+
+/** Google Slides files in the user's Drive. */
 function getSlides() {
   const files = DriveApp.searchFiles(`mimeType = '${MimeType.GOOGLE_SLIDES}' and trashed = false`);
   const list = [];
@@ -99,16 +111,16 @@ function getSlides() {
 }
 
 function createSlide() {
-  const pres = SlidesApp.create('Mail Merge 슬라이드 - ' + new Date().toLocaleString());
+  const pres = SlidesApp.create(t('slide_new_name', { date: new Date().toLocaleString() }));
   return { name: pres.getName(), url: pres.getUrl() };
 }
 
-/** 발송 전 확인용: 대상/이미 발송/오류 건수 */
+/** Pre-send check: how many rows will be sent / were already sent / have an invalid address. */
 function getSendPreview(sheetName) {
   const table = readTable_(getSheet_(sheetName), false);
   let pending = 0, sent = 0, invalid = 0;
   table.rows.forEach(r => {
-    if (r.status === CONFIG.STATUS_SENT) sent++;
+    if (r.sent) sent++;
     else if (!isValidEmail_(r.email)) invalid++;
     else pending++;
   });
@@ -116,12 +128,12 @@ function getSendPreview(sheetName) {
 }
 
 /**
- * 메일머지 실행
- * @param {Object} opts {draftId, sheetName, senderEmail, senderName, cc, bcc, mode:'test'|'run', slideUrl}
+ * Runs the mail merge.
+ * @param {Object} opts {draftId, sheetName, senderEmail, senderName, cc, bcc, mode: 'test'|'run', slideUrl}
  */
 function startMailMerge(opts) {
   const lock = LockService.getUserLock();
-  if (!lock.tryLock(1000)) throw new Error('이미 메일머지가 실행 중입니다. 끝난 뒤 다시 시도해 주세요.');
+  if (!lock.tryLock(1000)) throw new Error(t('err_busy'));
   try {
     return runMailMerge_(opts);
   } finally {
@@ -130,7 +142,7 @@ function startMailMerge(opts) {
 }
 
 /* ======================================================================
- * 메일머지 본체
+ * Mail merge core
  * ====================================================================== */
 
 function runMailMerge_(opts) {
@@ -139,10 +151,8 @@ function runMailMerge_(opts) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const tz = ss.getSpreadsheetTimeZone();
 
-  if (typeof Gmail === 'undefined') {
-    throw new Error('Gmail API 서비스가 추가되지 않았습니다. Apps Script 편집기 > 서비스(+) > Gmail API 를 추가해 주세요.');
-  }
-  if (!opts.draftId) throw new Error('메일 템플릿(임시보관함 초안)을 선택해 주세요.');
+  if (typeof Gmail === 'undefined') throw new Error(t('err_gmail_service'));
+  if (!opts.draftId) throw new Error(t('err_no_draft_selected'));
 
   const sheet = getSheet_(opts.sheetName);
   const table = readTable_(sheet, true);
@@ -156,45 +166,45 @@ function runMailMerge_(opts) {
     PropertiesService.getUserProperties().setProperty(CONFIG.PROP_SENDER_NAME, opts.senderName);
   }
 
-  // 발송 전에 API 사용 가능 여부를 한 번만 확인 → 꺼져 있으면 행마다 실패 기록하지 않고 바로 안내
+  // Check API availability once up front, so a disabled API produces one clear message
+  // instead of an error on every row.
   checkApi_('Gmail', () => Gmail.Users.getProfile('me'));
 
   let slideId = opts.slideUrl ? SlidesApp.openByUrl(opts.slideUrl).getId() : null;
-  if (slideId && !template.usesSlideImage) slideId = null; // 본문에 {{SlideImage}}가 없으면 슬라이드 작업 생략
+  if (slideId && !template.usesSlideImage) slideId = null; // no {{SlideImage}} in the draft → skip slides
   if (slideId) {
-    if (typeof Slides === 'undefined') {
-      throw new Error('Google Slides API 서비스가 추가되지 않았습니다. Apps Script 편집기 > 서비스(+) > Google Slides API 를 추가해 주세요.');
-    }
+    if (typeof Slides === 'undefined') throw new Error(t('err_slides_service'));
     checkApi_('Google Slides', () => Slides.Presentations.get(slideId, { fields: 'presentationId' }));
   }
+
   const log = [];
   const summary = { sent: 0, skipped: 0, failed: 0, remaining: 0, stoppedEarly: false, missingFields: [] };
   const missing = {};
 
   const targets = isTest ? table.rows.slice(0, 1) : table.rows;
-  if (targets.length === 0) throw new Error('보낼 데이터 행이 없습니다.');
+  if (targets.length === 0) throw new Error(t('err_no_rows'));
 
-  ss.toast(isTest ? '테스트 메일 발송 중...' : '메일머지 발송 중...', 'Mail Merge', -1);
+  ss.toast(isTest ? t('toast_test') : t('toast_run'), 'Mail Merge', -1);
 
   for (let i = 0; i < targets.length; i++) {
     const row = targets[i];
 
     if (!isTest && Date.now() - startedAt > CONFIG.TIME_LIMIT_MS) {
       summary.stoppedEarly = true;
-      summary.remaining = targets.slice(i).filter(r => r.status !== CONFIG.STATUS_SENT).length;
+      summary.remaining = targets.slice(i).filter(r => !r.sent).length;
       break;
     }
-    if (!isTest && row.status === CONFIG.STATUS_SENT) {
+    if (!isTest && row.sent) {
       summary.skipped++;
-      log.push({ type: 'skip', text: `${row.email} (${row.rowNumber}행) — 이미 발송됨` });
+      log.push({ type: 'skip', text: t('log_already_sent', { email: row.email, row: row.rowNumber }) });
       continue;
     }
 
     const to = isTest ? me : row.email;
     if (!isValidEmail_(to)) {
       summary.failed++;
-      setStatus_(sheet, row, table.statusCol, 'ERROR: 이메일 주소 없음/형식 오류', isTest);
-      log.push({ type: 'error', text: `${row.rowNumber}행 — 이메일 주소가 비었거나 형식이 잘못됨 (${to || '빈 칸'})` });
+      setStatus_(sheet, row, table.statusCol, 'ERROR: ' + t('status_invalid_email'), isTest);
+      log.push({ type: 'error', text: t('log_invalid_email', { row: row.rowNumber, value: to || t('value_empty') }) });
       continue;
     }
 
@@ -202,7 +212,7 @@ function runMailMerge_(opts) {
       const msg = renderMessage_(template, row, slideId, missing);
       const mime = buildMime_({
         from: from,
-        replyTo: opts.senderEmail || me, // 2023 버전의 replyTo 동작 유지
+        replyTo: opts.senderEmail || me,
         to: to,
         cc: isTest ? [] : cc,
         bcc: isTest ? [] : bcc,
@@ -215,7 +225,7 @@ function runMailMerge_(opts) {
       withRetry_(() => sendRawMime_(mime));
       summary.sent++;
       setStatus_(sheet, row, table.statusCol, CONFIG.STATUS_SENT, isTest);
-      log.push({ type: 'ok', text: isTest ? `테스트 메일 → ${to} (${row.rowNumber}행 데이터 사용)` : `${to}` });
+      log.push({ type: 'ok', text: isTest ? t('log_test_sent', { to: to, row: row.rowNumber }) : to });
     } catch (e) {
       summary.failed++;
       setStatus_(sheet, row, table.statusCol, 'ERROR: ' + e.message, isTest);
@@ -224,16 +234,16 @@ function runMailMerge_(opts) {
   }
 
   summary.missingFields = Object.keys(missing);
-  ss.toast('완료되었습니다.', 'Mail Merge', 3);
+  ss.toast(t('toast_done'), 'Mail Merge', 3);
   showResultDialog_(opts, sheet, template, summary, log, isTest, tz);
   return summary;
 }
 
-/** 한 행의 데이터로 제목/본문/인라인 이미지를 완성 */
+/** Fills subject, HTML body, plain body and inline images for one row. */
 function renderMessage_(template, row, slideId, missing) {
   const inline = template.inline.slice();
   let slideCid = null;
-  if (slideId && template.usesSlideImage) {
+  if (slideId) {
     inline.push({ cid: CONFIG.SLIDE_CID, blob: renderSlideImage_(slideId, row.pairs).setName('slide.png') });
     slideCid = CONFIG.SLIDE_CID;
   }
@@ -246,24 +256,24 @@ function renderMessage_(template, row, slideId, missing) {
 }
 
 /* ======================================================================
- * 시트 읽기
+ * Reading the sheet
  * ====================================================================== */
 
 function getSheet_(name) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
-  if (!sheet) throw new Error(`'${name}' 시트를 찾을 수 없습니다.`);
+  if (!sheet) throw new Error(t('err_sheet_not_found', { name: name }));
   return sheet;
 }
 
 /**
- * 시트를 읽어 행 목록으로 반환.
- * - 실제 시트 행 번호(rowNumber)를 함께 보관 → 빈 행이 있어도 상태가 올바른 행에 기록됨
- * - getDisplayValues 사용 → 날짜/숫자가 시트에 보이는 그대로 들어감
+ * Reads the sheet into row objects.
+ * - Keeps the real sheet row number, so statuses land on the right row even with blank rows.
+ * - Uses getDisplayValues so dates and numbers appear exactly as formatted in the sheet.
  */
 function readTable_(sheet, createStatusColumn) {
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
-  if (lastRow < 1 || lastCol < 1) throw new Error(`'${sheet.getName()}' 시트가 비어 있습니다.`);
+  if (lastRow < 1 || lastCol < 1) throw new Error(t('err_sheet_empty', { name: sheet.getName() }));
 
   const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0].map(h => String(h).trim());
 
@@ -275,15 +285,13 @@ function readTable_(sheet, createStatusColumn) {
   }
 
   const emailIdx = headers.findIndex(h => CONFIG.EMAIL_HEADERS.indexOf(normalizeKey_(h)) >= 0);
-  if (emailIdx < 0) {
-    throw new Error("이메일 열을 찾을 수 없습니다. 이메일이 들어있는 열의 머리행을 'Email' 또는 '이메일'로 적어주세요.");
-  }
+  if (emailIdx < 0) throw new Error(t('err_no_email_column'));
 
   const rows = [];
   if (lastRow >= 2) {
     const values = sheet.getRange(2, 1, lastRow - 1, headers.length).getDisplayValues();
     values.forEach((cells, i) => {
-      if (cells.every(c => String(c).trim() === '')) return; // 완전히 빈 행은 건너뜀
+      if (cells.every(c => String(c).trim() === '')) return; // skip completely empty rows
       const pairs = [];
       headers.forEach((h, c) => {
         if (h && c !== statusIdx) pairs.push([h, String(cells[c])]);
@@ -291,7 +299,7 @@ function readTable_(sheet, createStatusColumn) {
       rows.push({
         rowNumber: i + 2,
         email: String(cells[emailIdx]).trim(),
-        status: String(cells[statusIdx]).trim(),
+        sent: isSentStatus_(cells[statusIdx]),
         pairs: pairs,
         lookup: buildLookup_(pairs),
       });
@@ -300,20 +308,29 @@ function readTable_(sheet, createStatusColumn) {
   return { headers: headers, rows: rows, statusCol: statusIdx + 1 };
 }
 
+/**
+ * True when the status cell means "already sent".
+ * Case, spaces, '_' and '-' are ignored: EMAIL_SENT, Email_Sent, email sent, EMAIL-SENT all match.
+ */
+function isSentStatus_(value) {
+  const norm = s => String(s || '').toUpperCase().replace(/[\s_-]+/g, '');
+  return norm(value) === norm(CONFIG.STATUS_SENT);
+}
+
 function setStatus_(sheet, row, statusCol, text, isTest) {
   if (isTest) return;
   sheet.getRange(row.rowNumber, statusCol).setValue(String(text).slice(0, 300));
 }
 
 /* ======================================================================
- * 템플릿 (Gmail 초안)
+ * Template (Gmail draft)
  * ====================================================================== */
 
 function listDrafts_() {
   const tz = Session.getScriptTimeZone();
   return GmailApp.getDrafts().slice(0, CONFIG.MAX_DRAFTS).map(d => {
     const m = d.getMessage();
-    const subject = m.getSubject() || '(제목 없음)';
+    const subject = m.getSubject() || t('draft_no_subject');
     return {
       id: d.getId(),
       label: truncate_(subject, 40) + '  · ' + Utilities.formatDate(m.getDate(), tz, 'MM/dd HH:mm'),
@@ -322,34 +339,33 @@ function listDrafts_() {
 }
 
 function loadTemplate_(draftId) {
-  let draft;
+  let draft = null;
   try {
     draft = GmailApp.getDraft(draftId);
   } catch (e) {
-    draft = null;
+    // handled below
   }
-  if (!draft) throw new Error('선택한 초안을 찾을 수 없습니다. 사이드바에서 초안 목록을 새로고침해 주세요.');
+  if (!draft) throw new Error(t('err_draft_not_found'));
 
   const msg = draft.getMessage();
   const inlineBlobs = msg.getAttachments({ includeInlineImages: true, includeAttachments: false });
   const attachments = msg.getAttachments({ includeInlineImages: false, includeAttachments: true });
   const mapped = mapInlineImages_(msg.getBody(), inlineBlobs);
-  const html = mapped.html;
 
   return {
     subject: msg.getSubject() || '',
-    html: html,
+    html: mapped.html,
     plain: msg.getPlainBody() || '',
     inline: mapped.inline,
     attachments: attachments,
-    usesSlideImage: /\{\{[^{}]*slide\s*image[^{}]*\}\}/i.test(html),
+    usesSlideImage: /\{\{[^{}]*slide\s*image[^{}]*\}\}/i.test(mapped.html),
   };
 }
 
 /**
- * 초안 HTML의 <img> 와 인라인 이미지 Blob 을 Content-ID 로 연결.
- * - src="cid:..." 또는 data-surl="cid:..." 둘 다 처리 (예전 코드가 쓰던 방식 포함)
- * - alt(파일명)로 먼저 찾고, 못 찾으면 순서대로 연결
+ * Links each <img> in the draft HTML to its inline image blob via Content-ID.
+ * - Handles both src="cid:..." and data-surl="cid:..." (older Gmail markup).
+ * - Matches by alt (file name) first, then falls back to document order.
  */
 function mapInlineImages_(html, blobs) {
   const byName = {};
@@ -364,7 +380,7 @@ function mapInlineImages_(html, blobs) {
     const src = getAttr_(tag, 'src') || '';
     const surl = getAttr_(tag, 'data-surl') || '';
     const cidMatch = /^cid:(.+)$/i.exec(src) || /^cid:(.+)$/i.exec(surl);
-    if (!cidMatch) return tag; // 외부 URL 이미지 등은 그대로
+    if (!cidMatch) return tag; // external images etc. are left as-is
     const cid = cidMatch[1].trim();
 
     if (!seen[cid]) {
@@ -377,7 +393,7 @@ function mapInlineImages_(html, blobs) {
         unmatched.push(cid);
       }
     }
-    // src 가 cid 가 아니면(예: ?view=att...) cid 로 교체
+    // If src is not a cid: URL (e.g. "?view=att..."), point it at the cid.
     return /^cid:/i.test(src) ? tag : setAttr_(tag, 'src', 'cid:' + cid);
   });
 
@@ -389,10 +405,10 @@ function mapInlineImages_(html, blobs) {
 }
 
 /* ======================================================================
- * 머지 필드 치환
+ * Merge fields
  * ====================================================================== */
 
-/** 헤더 → 값 조회표. 원래 이름 / 소문자 / 정규화(공백·기호 제거) 세 가지 키로 등록 */
+/** Header → value lookup, keyed by original name, lower-case name and normalised name. */
 function buildLookup_(pairs) {
   const map = {};
   pairs.forEach(p => {
@@ -405,10 +421,10 @@ function buildLookup_(pairs) {
 }
 
 /**
- * {{필드}} 를 값으로 치환.
- * - Gmail 편집기가 {{<span>Name</span>}} 처럼 태그를 끼워 넣어도 인식
- * - HTML 본문에는 값을 이스케이프하고 줄바꿈은 <br> 로
- * - 값에 $ 가 있어도 깨지지 않도록 함수형 replace 사용
+ * Replaces {{Field}} markers with row values.
+ * - Recognises markers even when Gmail inserts tags inside them, e.g. {{<span>Name</span>}}.
+ * - Values are HTML-escaped in the HTML body, with line breaks turned into <br>.
+ * - Uses a replacer function so values containing "$" are inserted literally.
  */
 function fillTemplate_(template, lookup, options) {
   if (!template) return '';
@@ -440,18 +456,19 @@ function cleanPlaceholder_(inner) {
     .trim();
 }
 
-/** 소문자 + 영문/숫자/한글만 남김 ("Email Address" → "emailaddress") */
+/** Lower-cases and keeps only letters/digits (Latin and Hangul): "Email Address" → "emailaddress". */
 function normalizeKey_(s) {
   return String(s).toLowerCase().replace(/[^0-9a-z\u3131-\u318E\uAC00-\uD7A3]/g, '');
 }
 
 /* ======================================================================
- * 슬라이드 이미지 ({{SlideImage}})
+ * Slide image ({{SlideImage}})
  * ====================================================================== */
 
+/** Duplicates the first slide, fills in the row's values, renders it as PNG, then deletes the copy. */
 function renderSlideImage_(presentationId, pairs) {
   const pres = SlidesApp.openById(presentationId);
-  const copy = pres.getSlides()[0].duplicate(); // 첫 장을 템플릿으로 사용
+  const copy = pres.getSlides()[0].duplicate(); // the first slide is the template
   const copyId = copy.getObjectId();
   try {
     pairs.forEach(p => copy.replaceAllText('{{' + p[0] + '}}', p[1]));
@@ -463,7 +480,7 @@ function renderSlideImage_(presentationId, pairs) {
     });
     return UrlFetchApp.fetch(thumb.contentUrl).getBlob();
   } finally {
-    // 복사한 장은 반드시 삭제 (예전 코드는 발송할 때마다 슬라이드가 쌓였음)
+    // Always remove the temporary copy so the presentation doesn't grow with every recipient.
     const p = SlidesApp.openById(presentationId);
     const s = p.getSlideById(copyId);
     if (s) s.remove();
@@ -472,15 +489,15 @@ function renderSlideImage_(presentationId, pairs) {
 }
 
 /* ======================================================================
- * MIME 메시지 생성 / 발송 (이모지 대응의 핵심)
+ * MIME building / sending (this is what makes emoji work)
  * ====================================================================== */
 
 /**
- * RFC 2822/2045/2047 형식의 메일 원문을 만든다.
- * 모든 헤더의 비 ASCII 문자는 =?UTF-8?B?...?= 로, 본문은 UTF-8 base64 로 인코딩하므로
- * 이모지 같은 4바이트 문자도 깨지지 않는다.
+ * Builds an RFC 2822 / 2045 / 2047 message.
+ * Non-ASCII header text is encoded as =?UTF-8?B?...?= and bodies as UTF-8 base64,
+ * so 4-byte characters such as emoji are preserved.
  *
- * 구조: mixed( related( alternative(text, html), 인라인이미지... ), 첨부... )
+ * Structure: mixed( related( alternative(text, html), inline images... ), attachments... )
  */
 function buildMime_(m) {
   const textPart = {
@@ -541,7 +558,7 @@ function sendRawMime_(mime) {
   return Gmail.Users.Messages.send({ raw: Utilities.base64EncodeWebSafe(mime, Utilities.Charset.UTF_8) }, 'me');
 }
 
-/** 일시적 오류(요청 과다 등)는 잠시 기다렸다 재시도 */
+/** Retries transient failures (rate limits, backend errors) with back-off. */
 function withRetry_(fn) {
   const waits = [1000, 3000, 8000];
   for (let i = 0; ; i++) {
@@ -556,14 +573,14 @@ function withRetry_(fn) {
 }
 
 /**
- * RFC 2047 encoded-word. ASCII 면 그대로, 아니면 UTF-8 base64 로 인코딩.
- * 이모지(서로게이트 쌍)가 중간에 잘리지 않도록 '문자 단위'로 나눠 encoded-word 를 만든다.
- * @param {boolean} singleLine 파일명처럼 한 줄이어야 하는 경우 접기(folding) 없이 붙임
+ * RFC 2047 encoded-word. ASCII text is returned as-is; anything else is UTF-8/base64 encoded.
+ * Splits by character (not UTF-16 unit) so an emoji's surrogate pair is never cut in half.
+ * @param {boolean} singleLine join words without folding (used for file names)
  */
 function encodeHeaderWord_(text, singleLine) {
   text = String(text || '');
   if (/^[\x20-\x7E]*$/.test(text)) return text;
-  const MAX_BYTES = 45; // base64 후 60자 → encoded-word 75자 이내
+  const MAX_BYTES = 45; // 45 bytes → 60 base64 chars → 72-char encoded-word
   const words = [];
   let chunk = '', bytes = 0;
   Array.from(text).forEach(ch => {
@@ -580,7 +597,7 @@ function encodeHeaderWord_(text, singleLine) {
   return words.map(w => '=?UTF-8?B?' + base64Utf8_(w) + '?=').join(singleLine ? '' : '\r\n ');
 }
 
-/** "이름 <email>" 형식. 이름에 한글/이모지가 있으면 인코딩 */
+/** "Name <email>", encoding the display name when it contains non-ASCII characters. */
 function formatAddress_(name, email) {
   name = sanitizeHeader_(name || '').trim();
   email = sanitizeHeader_(email || '').trim();
@@ -590,45 +607,47 @@ function formatAddress_(name, email) {
 }
 
 /* ======================================================================
- * 결과 창
+ * Result dialog
  * ====================================================================== */
 
 function showResultDialog_(opts, sheet, template, summary, log, isTest, tz) {
   const color = { ok: '#1a73e8', skip: '#888', error: '#d93025' };
-  const label = { ok: '성공', skip: '건너뜀', error: '실패' };
+  const label = { ok: t('label_ok'), skip: t('label_skip'), error: t('label_error') };
   const now = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm:ss');
+  const e = escapeHtml_;
 
   let html = '<div style="font:13px/1.6 sans-serif">';
   html += '<div style="background:#f1f3f4;padding:10px;border-radius:6px;color:#444">';
-  html += `제목: ${escapeHtml_(template.subject)}<br>`;
-  html += `시트: ${escapeHtml_(sheet.getName())}<br>`;
-  html += `보낸 사람: ${escapeHtml_(opts.senderName || '')} &lt;${escapeHtml_(opts.senderEmail || '')}&gt;<br>`;
-  if (!isTest && opts.cc) html += `CC: ${escapeHtml_(opts.cc)}<br>`;
-  if (!isTest && opts.bcc) html += `BCC: ${escapeHtml_(opts.bcc)}<br>`;
-  html += `완료 시각: ${now}</div>`;
+  html += `${e(t('result_subject'))}: ${e(template.subject)}<br>`;
+  html += `${e(t('result_sheet'))}: ${e(sheet.getName())}<br>`;
+  html += `${e(t('result_from'))}: ${e(opts.senderName || '')} &lt;${e(opts.senderEmail || '')}&gt;<br>`;
+  if (!isTest && opts.cc) html += `CC: ${e(opts.cc)}<br>`;
+  if (!isTest && opts.bcc) html += `BCC: ${e(opts.bcc)}<br>`;
+  html += `${e(t('result_finished'))}: ${now}</div>`;
 
-  html += `<p><b>성공 ${summary.sent}</b> · 건너뜀 ${summary.skipped} · <span style="color:${color.error}">실패 ${summary.failed}</span></p>`;
+  html += `<p>${e(t('result_summary', { sent: summary.sent, skipped: summary.skipped, failed: summary.failed }))}</p>`;
   if (summary.stoppedEarly) {
-    html += `<p style="color:#e37400"><b>실행 시간 제한으로 멈췄습니다.</b> 남은 ${summary.remaining}건은 다시 RUN 하면 이어서 발송됩니다.</p>`;
+    html += `<p style="color:#e37400"><b>${e(t('result_stopped', { n: summary.remaining }))}</b></p>`;
   }
   if (summary.missingFields.length) {
-    html += `<p style="color:#e37400">시트에 없는 필드라 빈 값으로 들어간 항목: ${summary.missingFields.map(f => '{{' + escapeHtml_(f) + '}}').join(', ')}</p>`;
+    const fields = summary.missingFields.map(f => '{{' + f + '}}').join(', ');
+    html += `<p style="color:#e37400">${e(t('result_missing', { fields: fields }))}</p>`;
   }
   html += '<div style="max-height:260px;overflow:auto;border-top:1px solid #eee;padding-top:6px">';
   log.forEach(l => {
-    html += `<div><span style="color:${color[l.type]}">${label[l.type]}</span> : ${escapeHtml_(l.text)}</div>`;
+    html += `<div><span style="color:${color[l.type]}">${e(label[l.type])}</span> : ${e(l.text)}</div>`;
   });
   html += '</div></div>';
 
-  const out = HtmlService.createHtmlOutput(html).setWidth(520).setHeight(460);
-  SpreadsheetApp.getUi().showModalDialog(out, isTest ? '테스트 메일 결과' : '메일머지 결과');
+  const out = HtmlService.createHtmlOutput(html).setWidth(540).setHeight(460);
+  SpreadsheetApp.getUi().showModalDialog(out, isTest ? t('result_title_test') : t('result_title_run'));
 }
 
 /* ======================================================================
- * 보내는 사람
+ * Sender addresses
  * ====================================================================== */
 
-/** Gmail '다른 주소에서 메일 보내기'에 등록된 주소 목록 (기본 주소가 맨 앞) */
+/** Gmail "Send mail as" addresses (primary first). Falls back to GmailApp aliases. */
 function listSenders_() {
   try {
     const res = Gmail.Users.Settings.SendAs.list('me');
@@ -638,7 +657,7 @@ function listSenders_() {
     list.sort((a, b) => Number(b.primary) - Number(a.primary));
     if (list.length) return list;
   } catch (e) {
-    // Gmail API 미설정 등 → 아래 방식으로 대체
+    // Gmail API not available → fall back below
   }
   const me = Session.getActiveUser().getEmail();
   return [{ email: me, name: '', primary: true }].concat(
@@ -659,12 +678,12 @@ function getDefaultSenderName_(senders) {
 }
 
 /* ======================================================================
- * 유틸
+ * Utilities
  * ====================================================================== */
 
 /**
- * API 호출을 시험해 보고, "API가 꺼져 있음" 오류면 알아보기 쉬운 한글 안내로 바꿔서 던진다.
- * (스크립트가 '표준 Google Cloud 프로젝트'에 연결되어 있으면 Cloud Console에서 API를 직접 켜야 함)
+ * Calls an API once and turns "API disabled" errors into a readable message with the enable link.
+ * (Scripts linked to a standard Google Cloud project must enable APIs in the Cloud Console.)
  */
 function checkApi_(apiName, fn) {
   try {
@@ -673,9 +692,7 @@ function checkApi_(apiName, fn) {
     const msg = String(e.message || e);
     if (/has not been used in project|is disabled|SERVICE_DISABLED|accessNotConfigured/i.test(msg)) {
       const url = (msg.match(/https:\/\/console\.(?:developers|cloud)\.google\.com\/\S+/) || [''])[0].replace(/[.,)]+$/, '');
-      throw new Error(
-        `${apiName} API가 꺼져 있습니다. 아래 주소에서 [사용(ENABLE)]을 누른 뒤 1~2분 후 다시 시도하세요.\n${url}`
-      );
+      throw new Error(t('err_api_disabled', { api: apiName, url: url }));
     }
     throw e;
   }
@@ -684,7 +701,7 @@ function checkApi_(apiName, fn) {
 function parseAddressList_(text, label) {
   const list = String(text || '').split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
   const bad = list.filter(a => !isValidEmail_(a));
-  if (bad.length) throw new Error(`${label} 주소 형식이 올바르지 않습니다: ${bad.join(', ')}`);
+  if (bad.length) throw new Error(t('err_invalid_address', { label: label, list: bad.join(', ') }));
   return list;
 }
 
@@ -692,7 +709,7 @@ function isValidEmail_(s) {
   return /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/.test(String(s || '').trim());
 }
 
-/** 헤더 값에 줄바꿈이 들어가 헤더가 조작되는 것을 방지 */
+/** Prevents header injection via line breaks. */
 function sanitizeHeader_(s) {
   return String(s || '').replace(/[\r\n]+/g, ' ');
 }
@@ -748,7 +765,7 @@ function utf8Length_(ch) {
   return cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
 }
 
-/** 이모지가 반으로 잘리지 않도록 '문자' 단위로 자르기 */
+/** Truncates by character so emoji are never cut in half. */
 function truncate_(s, max) {
   const chars = Array.from(String(s));
   return chars.length > max ? chars.slice(0, max).join('') + '…' : chars.join('');

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+  <style>
+    body { font-size: 13px; line-height: 1.6; }
+    h4 { margin: 14px 0 4px; }
+    code { background: #f1f3f4; padding: 0 3px; border-radius: 3px; }
+    .foot { color: #80868b; font-size: 11px; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <h4>1. Create a template in Gmail</h4>
+  Write the email and save it as a <b>draft</b>. For parts that differ per recipient, use the column headers of your sheet,
+  e.g. <code>{{Name}}</code>, <code>{{Company}}</code>. Case and spaces are ignored:
+  <code>{{Email Address}}</code> = <code>{{emailaddress}}</code>.<br>
+  Emoji (🎄🎁) in the subject, body and sender name are supported. Inline images and attachments are sent as-is.
+
+  <h4>2. List recipients in a sheet</h4>
+  Row 1 is the header row. Name the email column <code>Email</code> (or <code>Email Address</code>).
+  A <code>Mail Merge Status</code> column is added automatically if missing.
+
+  <h4>3. Run the mail merge</h4>
+  Menu <b>▼Mail Merge▼ → Open Mail Merge</b>. Choose the template, sheet and From address,
+  send a <b>test email</b> to yourself first, then choose <b>Run mail merge</b>.
+  RUN shows the number of recipients; click again to start sending.
+
+  <h4>4. Check the results</h4>
+  Sent rows are marked <code>EMAIL_SENT</code>; failed rows show <code>ERROR: reason</code>.
+  Rows marked EMAIL_SENT are never sent again — clear the cell to resend.
+  If a long list hits the time limit (about 5 minutes), click RUN again to continue where it stopped.
+
+  <h4>5. Slide image (optional)</h4>
+  Design the first slide of a Google Slides file with fields such as <code>{{Name}}</code>,
+  then put <code>{{SlideImage}}</code> in the email body. Each recipient gets a personalised image card.
+
+  <h4>Language</h4>
+  Change the language with 🌐 at the top of the sidebar. The menu changes after reloading the spreadsheet.
+
+  <div class="foot">Mail Merge with inline images © David Sung ·
+    <a href="https://github.com/david097/GAS-Mail-Merge-with-inline-images" target="_blank">GitHub</a></div>
+</body>
+</html>

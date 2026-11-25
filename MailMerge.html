@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="<?= lang ?>">
 <head>
   <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,81 +18,104 @@
     #status.warn { color: #e37400; }
     #status.ok { color: #188038; }
     .hidden { display: none; }
+    .lang { display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-bottom: 8px; font-size: 12px; color: #5f6368; }
+    .lang select { width: auto; }
     .footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 8px 12px; background: #fff; border-top: 1px solid #eee; color: #80868b; font-size: 11px; }
   </style>
 </head>
 <body>
 <div class="sidebar">
-  <form id="form" onsubmit="return false">
+
+  <div class="lang">
+    <span>🌐</span>
+    <select id="language" title="<?= s.language_hint ?>">
+      <? languages.forEach(function (l) { ?>
+        <option value="<?= l.code ?>"<? if (l.code === lang) { ?> selected<? } ?>><?= l.name ?></option>
+      <? }); ?>
+    </select>
+  </div>
+
+  <form id="form" onsubmit="return false" autocomplete="off">
 
     <div class="block">
-      <label class="title" for="draft">메일 템플릿 (Gmail 임시보관함)</label>
+      <label class="title" for="draft"><?= s.draft_label ?></label>
       <div class="row">
-        <select id="draft"><option>불러오는 중...</option></select>
-        <a class="link" id="reloadDrafts" title="초안 목록 새로고침">새로고침</a>
+        <select id="draft"><option><?= s.loading ?></option></select>
+        <a class="link" id="reloadDrafts"><?= s.reload ?></a>
       </div>
-      <div class="hint" id="draftHint">제목/본문에 {{Name}}, {{이름}} 처럼 시트 머리행 이름을 넣으세요.</div>
+      <div class="hint" id="draftHint"><?= s.draft_hint ?></div>
     </div>
 
     <div class="block">
-      <label class="title" for="sheet">받는 사람 시트</label>
+      <label class="title" for="sheet"><?= s.sheet_label ?></label>
       <select id="sheet"></select>
     </div>
 
     <div class="block">
-      <label class="title" for="senderEmail">보내는 주소</label>
+      <label class="title" for="senderEmail"><?= s.from_label ?></label>
       <select id="senderEmail"></select>
     </div>
 
     <div class="block">
-      <label class="title" for="senderName">보내는 사람 이름</label>
+      <label class="title" for="senderName"><?= s.name_label ?></label>
       <input type="text" id="senderName">
     </div>
 
     <div class="block">
-      <label class="title" for="cc">CC (선택)</label>
-      <input type="text" id="cc" placeholder="쉼표로 구분">
+      <label class="title" for="cc"><?= s.cc_label ?></label>
+      <input type="text" id="cc" placeholder="<?= s.comma_separated ?>">
     </div>
 
     <div class="block">
-      <label class="title" for="bcc">BCC (선택)</label>
-      <input type="text" id="bcc" placeholder="쉼표로 구분">
+      <label class="title" for="bcc"><?= s.bcc_label ?></label>
+      <input type="text" id="bcc" placeholder="<?= s.comma_separated ?>">
     </div>
 
     <div class="block">
-      <label><input type="checkbox" id="useSlide"> 슬라이드 이미지 넣기 <code>{{SlideImage}}</code></label>
+      <label><input type="checkbox" id="useSlide"> <?= s.slide_check ?> <code>{{SlideImage}}</code></label>
       <div id="slideBox" class="hidden" style="margin-top:4px">
         <div class="row">
           <select id="slide"></select>
-          <a class="link" id="openSlide">열기</a>
-          <a class="link" id="newSlide">새로 만들기</a>
+          <a class="link" id="openSlide"><?= s.slide_open ?></a>
+          <a class="link" id="newSlide"><?= s.slide_new ?></a>
         </div>
-        <div class="hint">첫 번째 장이 템플릿입니다. 장 안의 {{Name}} 등이 치환되어 이미지로 들어갑니다.</div>
+        <div class="hint"><?= s.slide_hint ?></div>
       </div>
     </div>
 
     <div class="block">
       <fieldset>
-        <legend><b>무엇을 할까요?</b></legend>
-        <div><input type="radio" id="modeTest" name="mode" value="test"> <label for="modeTest">테스트 메일 보내기 (나에게 1통)</label></div>
-        <div><input type="radio" id="modeRun" name="mode" value="run" checked> <label for="modeRun">메일머지 실행</label></div>
+        <legend><b><?= s.mode_legend ?></b></legend>
+        <div><input type="radio" id="modeTest" name="mode" value="test"> <label for="modeTest"><?= s.mode_test ?></label></div>
+        <div><input type="radio" id="modeRun" name="mode" value="run" checked> <label for="modeRun"><?= s.mode_run ?></label></div>
       </fieldset>
     </div>
 
     <div class="block">
-      <button type="button" id="runBtn" class="action">RUN</button>
-      <button type="button" id="resetBtn">새로고침</button>
+      <button type="button" id="runBtn" class="action"><?= s.btn_run ?></button>
+      <button type="button" id="resetBtn"><?= s.btn_reset ?></button>
       <div id="status"></div>
     </div>
   </form>
 </div>
 
-<div class="footer">Mail Merge with inline images © David Sung</div>
+<div class="footer">Mail Merge with inline images © David Sung · <a href="https://github.com/david097/GAS-Mail-Merge-with-inline-images" target="_blank">GitHub</a></div>
 
 <script>
+  // UI strings for the current language (from Lang_*.gs)
+  var S = <?!= JSON.stringify(s).replace(/</g, '\\u003c') ?>;
+
   var $ = function (id) { return document.getElementById(id); };
   var senders = [];
-  var confirmPending = false; // RUN 두 번 눌러야 실제 발송
+  var confirmPending = false; // RUN must be clicked twice to actually send
+
+  /** Same placeholder format as t() on the server: tr('key', {n: 3}) */
+  function tr(key, params) {
+    var text = S[key] !== undefined ? S[key] : key;
+    return text.replace(/\{(\w+)\}/g, function (m, k) {
+      return params && Object.prototype.hasOwnProperty.call(params, k) ? String(params[k]) : m;
+    });
+  }
 
   function setStatus(text, cls) {
     $('status').textContent = text || '';
@@ -122,16 +145,23 @@
 
   function renderDrafts(drafts) {
     if (!drafts.length) {
-      fillSelect($('draft'), [{ id: '', label: '(임시보관함에 초안이 없습니다)' }], function (d) { return d.id; }, function (d) { return d.label; });
-      $('draftHint').innerHTML = 'Gmail에서 보낼 메일을 작성해 임시보관함에 저장한 뒤 <b>새로고침</b>을 누르세요. ' +
-        '<a class="link" href="https://mail.google.com/mail/u/0/#inbox?compose=new" target="_blank">Gmail 새 메일 쓰기</a>';
+      fillSelect($('draft'), [{ id: '', label: S.no_drafts }], function (d) { return d.id; }, function (d) { return d.label; });
+      var hint = $('draftHint');
+      hint.textContent = S.no_drafts_hint + ' ';
+      var a = document.createElement('a');
+      a.className = 'link';
+      a.href = 'https://mail.google.com/mail/u/0/#inbox?compose=new';
+      a.target = '_blank';
+      a.textContent = S.gmail_compose;
+      hint.appendChild(a);
       return;
     }
+    $('draftHint').textContent = S.draft_hint;
     fillSelect($('draft'), drafts, function (d) { return d.id; }, function (d) { return d.label; });
   }
 
   function load() {
-    setStatus('불러오는 중...');
+    setStatus(S.loading);
     resetRunButton();
     call('getSidebarData', [], function (data) {
       renderDrafts(data.drafts);
@@ -144,24 +174,24 @@
   }
 
   function loadSlides() {
-    $('slide').innerHTML = '<option>불러오는 중...</option>';
+    fillSelect($('slide'), [S.loading], function () { return ''; }, function (x) { return x; });
     call('getSlides', [], function (slides) {
       if (!slides.length) {
-        $('slide').innerHTML = '<option value="">(슬라이드 없음 — 새로 만들기)</option>';
+        fillSelect($('slide'), [S.slide_none], function () { return ''; }, function (x) { return x; });
         return;
       }
       fillSelect($('slide'), slides, function (s) { return s.url; }, function (s) { return s.name; });
     });
   }
 
+  function mode() {
+    return document.querySelector('input[name="mode"]:checked').value;
+  }
+
   function resetRunButton() {
     confirmPending = false;
     $('runBtn').disabled = false;
-    $('runBtn').textContent = mode() === 'test' ? 'TEST' : 'RUN';
-  }
-
-  function mode() {
-    return document.querySelector('input[name="mode"]:checked').value;
+    $('runBtn').textContent = mode() === 'test' ? S.btn_test : S.btn_run;
   }
 
   function collect() {
@@ -179,38 +209,40 @@
 
   function send(opts) {
     $('runBtn').disabled = true;
-    setStatus(opts.mode === 'test' ? '테스트 메일 보내는 중...' : '발송 중... 창을 닫지 마세요.');
+    setStatus(opts.mode === 'test' ? S.sending_test : S.sending_run);
     call('startMailMerge', [opts], function (r) {
-      var msg = '성공 ' + r.sent + ' · 건너뜀 ' + r.skipped + ' · 실패 ' + r.failed;
-      if (r.stoppedEarly) msg += '\n시간 제한으로 멈췄습니다. 남은 ' + r.remaining + '건은 RUN을 다시 누르면 이어서 보냅니다.';
-      if (r.missingFields && r.missingFields.length) msg += '\n시트에 없는 필드: ' + r.missingFields.join(', ');
-      setStatus(msg, r.failed || r.stoppedEarly || (r.missingFields && r.missingFields.length) ? 'warn' : 'ok');
+      var msg = tr('result_summary', { sent: r.sent, skipped: r.skipped, failed: r.failed });
+      if (r.stoppedEarly) msg += '\n' + tr('result_stopped', { n: r.remaining });
+      var hasMissing = r.missingFields && r.missingFields.length;
+      if (hasMissing) {
+        msg += '\n' + tr('result_missing', { fields: r.missingFields.map(function (f) { return '{{' + f + '}}'; }).join(', ') });
+      }
+      setStatus(msg, r.failed || r.stoppedEarly || hasMissing ? 'warn' : 'ok');
       resetRunButton();
     });
   }
 
   $('runBtn').addEventListener('click', function () {
     var opts = collect();
-    if (!opts.draftId) return setStatus('메일 템플릿(초안)을 선택해 주세요.', 'err');
+    if (!opts.draftId) return setStatus(S.err_no_draft_selected, 'err');
     if (opts.mode === 'test') return send(opts);
-
     if (confirmPending) return send(opts);
 
-    // 실제 발송 전 한 번 확인
+    // Show how many people will receive the email, then require a second click.
     $('runBtn').disabled = true;
     call('getSendPreview', [opts.sheetName], function (p) {
       $('runBtn').disabled = false;
       if (!p.pending) {
-        setStatus('보낼 대상이 없습니다. (이미 발송 ' + p.sent + '건, 주소 오류 ' + p.invalid + '건)\n다시 보내려면 Mail Merge Status 칸의 EMAIL_SENT 를 지우세요.', 'warn');
+        setStatus(tr('nothing_to_send', { sent: p.sent, invalid: p.invalid }), 'warn');
         return;
       }
       confirmPending = true;
-      $('runBtn').textContent = p.pending + '명에게 발송';
-      setStatus('발송 대상 ' + p.pending + '명 (이미 발송 ' + p.sent + ', 주소 오류 ' + p.invalid + ')\n버튼을 한 번 더 누르면 발송을 시작합니다.', 'warn');
+      $('runBtn').textContent = tr('btn_confirm', { n: p.pending });
+      setStatus(tr('confirm_text', { n: p.pending, sent: p.sent, invalid: p.invalid }), 'warn');
     });
   });
 
-  // 입력값이 바뀌면 확인 상태 해제
+  // Any change cancels a pending confirmation.
   ['draft', 'sheet', 'senderEmail', 'modeTest', 'modeRun'].forEach(function (id) {
     $(id).addEventListener('change', function () { resetRunButton(); setStatus(''); });
   });
@@ -236,14 +268,23 @@
   });
 
   $('newSlide').addEventListener('click', function () {
-    setStatus('슬라이드 만드는 중...');
+    setStatus(S.slide_creating);
     call('createSlide', [], function (s) {
-      // 비동기 후 window.open 은 팝업 차단에 걸리므로 목록에 추가하고 '열기'로 안내
-      $('slide').innerHTML = '';
+      // window.open after an async call is blocked as a pop-up, so add it to the list instead.
       fillSelect($('slide'), [s], function (x) { return x.url; }, function (x) { return x.name; });
-      setStatus("새 슬라이드를 만들었습니다. '열기'를 눌러 첫 장에 {{Name}} 등을 넣어 꾸미세요.", 'ok');
+      setStatus(S.slide_created, 'ok');
     });
   });
+
+  $('language').addEventListener('change', function () {
+    setStatus(S.loading);
+    // The server saves the choice and reopens the sidebar in the new language.
+    call('changeLanguage', [this.value], function () {});
+  });
+
+  // Browsers may restore a checked state on reload while the box stays hidden; always start unchecked.
+  $('useSlide').checked = false;
+  $('slideBox').className = 'hidden';
 
   load();
 </script>
