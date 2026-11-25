@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
   <style>
-    body { padding-bottom: 40px; }
+    /* Content scrolls in its own area above the footer, so long messages are never hidden. */
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    .main { position: absolute; top: 0; left: 0; right: 0; bottom: 34px; overflow-y: auto; padding: 12px; box-sizing: border-box; }
     .block { margin-bottom: 12px; }
     label.title { color: #5f6368; display: block; margin-bottom: 3px; }
     select, input[type=text] { width: 100%; box-sizing: border-box; }
@@ -20,11 +22,11 @@
     .hidden { display: none; }
     .lang { display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-bottom: 8px; font-size: 12px; color: #5f6368; }
     .lang select { width: auto; }
-    .footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 8px 12px; background: #fff; border-top: 1px solid #eee; color: #80868b; font-size: 11px; }
+    .footer { position: absolute; bottom: 0; left: 0; right: 0; height: 34px; line-height: 34px; padding: 0 12px; box-sizing: border-box; background: #fff; border-top: 1px solid #eee; color: #80868b; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   </style>
 </head>
 <body>
-<div class="sidebar">
+<div class="main">
 
   <div class="lang">
     <span>🌐</span>
@@ -120,6 +122,8 @@
   function setStatus(text, cls) {
     $('status').textContent = text || '';
     $('status').className = cls || '';
+    // Bring the message into view in case the sidebar is scrolled up.
+    if (text) $('status').scrollIntoView({ block: 'nearest' });
   }
 
   function fillSelect(sel, items, getValue, getLabel, selected) {
