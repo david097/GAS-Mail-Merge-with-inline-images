@@ -1,408 +1,251 @@
 <!DOCTYPE html>
-<!-- Made by David Sung -->
-<!-- 
-<refer css >
-css : https://developers.google.com/gsuite/add-ons/guides/css
--->
 <html>
-  <head>
-    <base target="_top">
-    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-    <style>
-    .branding-below {
-      bottom: 40px;
-      top: 0;
-    }
-    .branding-text {
-      left: 7px;
-      position: relative;
-      top: 3px;
-    }
-    .logo {
-      vertical-align: middle;
-    }
-    .width-100 {
-      width: 100%;
-      box-sizing: border-box;
-      -webkit-box-sizing: border-box;
-      -moz-box-sizing: border-box;
-    }
-    .width-90 {
-      width: 90%;
-      box-sizing: border-box;
-      -webkit-box-sizing: border-box;
-      -moz-box-sizing: border-box;
-    }  
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+  <style>
+    body { padding-bottom: 40px; }
+    .block { margin-bottom: 12px; }
+    label.title { color: #5f6368; display: block; margin-bottom: 3px; }
+    select, input[type=text] { width: 100%; box-sizing: border-box; }
+    .row { display: flex; gap: 6px; align-items: center; }
+    .row select { flex: 1; }
+    .link { font-size: 12px; cursor: pointer; color: #1a73e8; text-decoration: none; white-space: nowrap; }
+    .hint { color: #80868b; font-size: 11px; margin-top: 2px; }
+    #status { margin-top: 10px; white-space: pre-line; }
+    #status.err { color: #d93025; }
+    #status.warn { color: #e37400; }
+    #status.ok { color: #188038; }
+    .hidden { display: none; }
+    .footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 8px 12px; background: #fff; border-top: 1px solid #eee; color: #80868b; font-size: 11px; }
+  </style>
+</head>
+<body>
+<div class="sidebar">
+  <form id="form" onsubmit="return false">
 
-    label {
-      color: gray;
-      /*font-size: 14px;*/
-    }
-    </style>
-    
-    <script>
-      // Prevent forms from submitting.
-      function preventFormSubmit() {
-        var forms = document.querySelectorAll('form');
-        for (var i = 0; i < forms.length; i++) {
-          forms[i].addEventListener('submit', function(event) {
-            event.preventDefault();
-          });
-        }
-      }
-      
-      window.addEventListener('load', preventFormSubmit);
-      /*
-      function handleFormSubmit(formObject) {
-        this.disabled = true;
-        $('#error').remove();
-        google.script.run
-            .withSuccessHandler(updateUrl)
-            .withFailureHandler(
-              function(msg, element) {
-                showError(msg, $('#toast'));
-                element.disabled = false;
-              })
-            .processForm(formObject);
-      }
-      
-      function updateUrl(url) {
-        var div = document.getElementById('output');
-        div.innerHTML = '<a href="' + url + '">Got it!</a>';
-      }
-      */
-      
-    </script>
-  </head>
-  
-  <body>
-
-    <div class="sidebar branding-below">
-      <form>
-        <div class="block">
-          <label for="draft">Templates in draft (latest 10)</label>
-          <select id="draft" name="draft" class="width-100">
-            <option selected>Select...</option>
-          </select>
-        </div>
-
-        <div class="block">
-          <label for="datasheet">Mail Merge Sheet</label>
-          <select id="datasheet" name="datasheet" class="width-100">
-            <option selected>Select...</option>
-          </select>
-        </div>
-        
-        <div class="block">
-          <label for="senderEmail">From</label>
-          <select id="senderEmail" name="senderEmail" class="width-100">
-            <option selected>Select...</option>
-          </select>
-        </div>
-        
-        <div class="block">
-          <label for="senderName">Sender's Name</label>
-          <input type="text" id="senderName" class="width-100">
-        </div>
-        
-        <!--
-        <div class="block">
-          <label for="ccEmail">CC Email</label>
-          <input type="text" id="ccEmail" class="width-100" placeholder="Optional">
-        </div>
-        -->
-
-        <div class="block">
-          <label for="bccEmail">BCC (Option)</label>
-          <input type="text" id="bccEmail" class="width-100" placeholder="Comma-seperated email address">
-        </div>
-
-        <div class="block">
-          <label for="slideimage">with silde image? {{SlideImage}}</label>
-          <input type="checkbox" id="slideimage">
-          <select id="slide" name="slide" class="width-90">
-            <option selected>Select...</option>
-          </select>
-          <img id="slideOpenBtn" style="width:16px;height:16px" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiA/PjwhRE9DVFlQRSBzdmcgIFBVQkxJQyAnLS8vVzNDLy9EVEQgU1ZHIDEuMS8vRU4nICAnaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkJz48c3ZnIGVuYWJsZS1iYWNrZ3JvdW5kPSJuZXcgMCAwIDUwIDUwIiBoZWlnaHQ9IjUwcHgiIGlkPSJMYXllcl8xIiB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCA1MCA1MCIgd2lkdGg9IjUwcHgiIHhtbDpzcGFjZT0icHJlc2VydmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiPjxyZWN0IGZpbGw9Im5vbmUiIGhlaWdodD0iNTAiIHdpZHRoPSI1MCIvPjxwYXRoIGQ9Ik00NiwxNXYtNCAgYzAtMS4xMDQtMC44OTYtMi0yLTJjMCwwLTI0LjY0OCwwLTI2LDBjLTEuNDY5LDAtMi40ODQtNC00LTRIM0MxLjg5Niw1LDEsNS44OTYsMSw3djR2Mjl2NGMwLDEuMTA0LDAuODk2LDIsMiwyaDM5ICBjMS4xMDQsMCwyLTAuODk2LDItMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwMDAwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1taXRlcmxpbWl0PSIxMCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTEsNDRsNS0yNyAgYzAtMS4xMDQsMC44OTYtMiwyLTJoMzljMS4xMDQsMCwyLDAuODk2LDIsMmwtNSwyNyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMDAwMDAwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1taXRlcmxpbWl0PSIxMCIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+"/>          
-        </div>
-
-
-
-        <div class="block">
-        <fieldset>
-          <legend><span><b>What would you like to do?</b></span></legend>
-            <div>
-              <input type="radio" id="test" name="radioTxt" value="test">
-              <label for="test">Send a Test email</label>
-            </div>
-            <div>
-              <input type="radio" id="run" name="radioTxt" value="run" checked>
-              <label for="run" class="current">Run Mail Merge</label>
-            </div>
-        </fieldset>
-        </div>
-
-        <div id="last" class="block">
-          <button type="submit" id="submitBtn" class="action">RUN</button>
-          <button type="reset" id="resetBtn">RESET</button>
-          <!--button type="button" id="resultBtn" class="current">RESULT</button-->
-        </div>        
-      </form>
-
-    </div>
-    
-    <div class="sidebar bottom">
-      <img alt="Add-on logo" class="logo"  width="24" height="24" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0%0D%0APSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij4KICAgIDxwYXRoIGQ9Ik0yLjAxIDIxTDIzIDEyIDIu%0D%0AMDEgMyAyIDEwbDE1IDItMTUgMnoiLz4KICAgIDxwYXRoIGQ9Ik0wIDBoMjR2MjRIMHoiIGZpbGw9%0D%0AIm5vbmUiLz4KPC9zdmc+Cg==">
-      <span class="gray branding-text">© David Sung 2019 <a href="https://github.com/david097/GAS-Mail-Merge-with-inline-images" target="_blank">GitHub</a></span>
+    <div class="block">
+      <label class="title" for="draft">메일 템플릿 (Gmail 임시보관함)</label>
+      <div class="row">
+        <select id="draft"><option>불러오는 중...</option></select>
+        <a class="link" id="reloadDrafts" title="초안 목록 새로고침">새로고침</a>
+      </div>
+      <div class="hint" id="draftHint">제목/본문에 {{Name}}, {{이름}} 처럼 시트 머리행 이름을 넣으세요.</div>
     </div>
 
-    <script>
-      // Click with Slide Image!
-      $("#slide").hide();
-      $("#slideOpenBtn").hide();
-        $('input[id="slideimage"]').click(function(){
-            if($(this).prop("checked") == true){
-                isSlide();
-                $("#slide").show();
-                $("#slideOpenBtn").show();
-                
-                
-            }
-            else if($(this).prop("checked") == false){
-                $("#slide").hide();
-                $("#slideOpenBtn").hide();
-            }
-        });
+    <div class="block">
+      <label class="title" for="sheet">받는 사람 시트</label>
+      <select id="sheet"></select>
+    </div>
 
-      $("#slideOpenBtn").click(function () {
-        window.open($("#slide  option:selected").val());
+    <div class="block">
+      <label class="title" for="senderEmail">보내는 주소</label>
+      <select id="senderEmail"></select>
+    </div>
+
+    <div class="block">
+      <label class="title" for="senderName">보내는 사람 이름</label>
+      <input type="text" id="senderName">
+    </div>
+
+    <div class="block">
+      <label class="title" for="cc">CC (선택)</label>
+      <input type="text" id="cc" placeholder="쉼표로 구분">
+    </div>
+
+    <div class="block">
+      <label class="title" for="bcc">BCC (선택)</label>
+      <input type="text" id="bcc" placeholder="쉼표로 구분">
+    </div>
+
+    <div class="block">
+      <label><input type="checkbox" id="useSlide"> 슬라이드 이미지 넣기 <code>{{SlideImage}}</code></label>
+      <div id="slideBox" class="hidden" style="margin-top:4px">
+        <div class="row">
+          <select id="slide"></select>
+          <a class="link" id="openSlide">열기</a>
+          <a class="link" id="newSlide">새로 만들기</a>
+        </div>
+        <div class="hint">첫 번째 장이 템플릿입니다. 장 안의 {{Name}} 등이 치환되어 이미지로 들어갑니다.</div>
+      </div>
+    </div>
+
+    <div class="block">
+      <fieldset>
+        <legend><b>무엇을 할까요?</b></legend>
+        <div><input type="radio" id="modeTest" name="mode" value="test"> <label for="modeTest">테스트 메일 보내기 (나에게 1통)</label></div>
+        <div><input type="radio" id="modeRun" name="mode" value="run" checked> <label for="modeRun">메일머지 실행</label></div>
+      </fieldset>
+    </div>
+
+    <div class="block">
+      <button type="button" id="runBtn" class="action">RUN</button>
+      <button type="button" id="resetBtn">새로고침</button>
+      <div id="status"></div>
+    </div>
+  </form>
+</div>
+
+<div class="footer">Mail Merge with inline images © David Sung</div>
+
+<script>
+  var $ = function (id) { return document.getElementById(id); };
+  var senders = [];
+  var confirmPending = false; // RUN 두 번 눌러야 실제 발송
+
+  function setStatus(text, cls) {
+    $('status').textContent = text || '';
+    $('status').className = cls || '';
+  }
+
+  function fillSelect(sel, items, getValue, getLabel, selected) {
+    sel.innerHTML = '';
+    items.forEach(function (item) {
+      var opt = document.createElement('option');
+      opt.value = getValue(item);
+      opt.textContent = getLabel(item);
+      if (selected !== undefined && opt.value === selected) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  function call(fnName, args, onOk) {
+    var runner = google.script.run
+      .withSuccessHandler(onOk)
+      .withFailureHandler(function (err) {
+        setStatus(err.message || String(err), 'err');
+        resetRunButton();
       });
-      
-    
-     // Click Submit Button, run Mail Merge!
-      $('#submitBtn').click(function(event) {
-      
-       this.disabled = true;
-       $('#status').remove();
-       var draft = $( '#draft option:selected').text();
-       var sheetName = $( '#datasheet option:selected').text();
-       var senderEmail = $( '#senderEmail option:selected').text();
-       var senderName = $( '#senderName' ).val(); 
-       var ccEmail = ""; //var ccEmail = $( '#ccEmail' ).val().trim(); 
-       var bccEmail = $( '#bccEmail' ).val().trim(); 
-       var isTest = $('input[name="radioTxt"]:checked').val();
-       var withSlide = $('input[id="slideimage"]').prop("checked");
-       var slideUrl =  $("#slide  option:selected").val();
-       
-        
-        google.script.run
-            .withSuccessHandler(
-              function(msg, element) {
-              $("#submitBtn").attr("disabled", false);
-              showStatus('Done', $('#last'));
-              })
-            .withFailureHandler(
-              function(msg, element) {
-              $("#submitBtn").attr("disabled", false);
-              $("#status").text("Done");
-                showStatus(msg, $('#last'));
-                element.disabled = false;
-              })
-            .startMailMerge(draft, sheetName, senderEmail, senderName, ccEmail, bccEmail, isTest, withSlide, slideUrl);
-            
-      });   
-     
-    // Replace the submit button text when click the radio button 
-    $("#test").click(function () {
-      $("#submitBtn").text("TEST");   
-    }); 
-    
-    $("#run").click(function () {
-      $("#submitBtn").text("RUN");    
-    });    
-    
-    // When Reset Button clicked, get Myname!
-      $('#resetBtn').click(function(event) {
-        $("#submitBtn").attr("disabled", false);
-        $("#submitBtn").text("RUN");
-        $('#status').remove();
-        google.script.run
-            .withSuccessHandler(
-              function(msg, element) {
-              buildDraftList(msg);
-              })
-            .withFailureHandler(
-              function(msg, element) {
-              showStatus(msg, $('#draft'));
-              element.disabled = false;
-              }) 
-        .getDraft();
-        
-        google.script.run
-            .withSuccessHandler(
-              function(msg, element) {
-              myName(msg);
-              })
-            .withFailureHandler(
-              function(msg, element) {
-              showStatus(msg, $('#senderName'));
-              element.disabled = false;
-              })     
-        .getMyName();
-        $("#slide").hide();
-        $("#slideOpenBtn").hide();
-      });
+    runner[fnName].apply(runner, args || []);
+  }
 
-
-
-    // Get Slide File lists automatically when page loads   
-    function isSlide(){
-        google.script.run
-            .withSuccessHandler(
-              function(msg, element) {
-              mySlides(msg);
-              })
-            .withFailureHandler(
-              function(msg, element) {
-              showStatus(msg, $('#slide'));
-              element.disabled = false;
-              })     
-        .getSlides();
+  function renderDrafts(drafts) {
+    if (!drafts.length) {
+      fillSelect($('draft'), [{ id: '', label: '(임시보관함에 초안이 없습니다)' }], function (d) { return d.id; }, function (d) { return d.label; });
+      $('draftHint').innerHTML = 'Gmail에서 보낼 메일을 작성해 임시보관함에 저장한 뒤 <b>새로고침</b>을 누르세요. ' +
+        '<a class="link" href="https://mail.google.com/mail/u/0/#inbox?compose=new" target="_blank">Gmail 새 메일 쓰기</a>';
+      return;
     }
+    fillSelect($('draft'), drafts, function (d) { return d.id; }, function (d) { return d.label; });
+  }
 
+  function load() {
+    setStatus('불러오는 중...');
+    resetRunButton();
+    call('getSidebarData', [], function (data) {
+      renderDrafts(data.drafts);
+      fillSelect($('sheet'), data.sheets, function (s) { return s; }, function (s) { return s; }, data.activeSheet);
+      senders = data.senders;
+      fillSelect($('senderEmail'), senders, function (s) { return s.email; }, function (s) { return s.email; });
+      $('senderName').value = data.senderName || '';
+      setStatus('');
+    });
+  }
 
-
-    // Get my name (user name) automatically when page loads   
-      $(function () {
-        google.script.run
-            .withSuccessHandler(
-              function(msg, element) {
-              myName(msg);
-              })
-            .withFailureHandler(
-              function(msg, element) {
-              showStatus(msg, $('#senderName'));
-              element.disabled = false;
-              })     
-        .getMyName();
-      });
-
-    // Get Draft Email Template When Page Loads
-      $(function () {
-        google.script.run
-            .withSuccessHandler(
-              function(msg, element) {
-              buildDraftList(msg);
-              })
-            .withFailureHandler(
-              function(msg, element) {
-              showStatus(msg, $('#draft'));
-              element.disabled = false;
-              })        
-         .getDraft();
-      });
-      
-      // Get email account (alias) when page loads
-      $(function () {
-        google.script.run
-            .withSuccessHandler(
-              function(msg, element) {
-              buildsenderEmailList(msg);
-              })
-            .withFailureHandler(
-              function(msg, element) {
-              showStatus(msg, $('#senderEmail'));
-              element.disabled = false;
-              })
-        .getSenderEmail();
-      });
-      
-      // Get data sheet when page loads
-      $(function () {
-        google.script.run
-            .withSuccessHandler(
-              function(msg, element) {
-              buildDataSheetList(msg);
-              })
-            .withFailureHandler(
-              function(msg, element) {
-              showStatus(msg, $('#datasheet'));
-              element.disabled = false;
-              })        
-        .getDataSheet();
-      });
-
-
-
-    // Get my namefunction
-      function myName(myName) {
-        $('#senderName').val(myName);
+  function loadSlides() {
+    $('slide').innerHTML = '<option>불러오는 중...</option>';
+    call('getSlides', [], function (slides) {
+      if (!slides.length) {
+        $('slide').innerHTML = '<option value="">(슬라이드 없음 — 새로 만들기)</option>';
+        return;
       }
-      
-      
-      // My Slides parsing function 
-      function mySlides(returnVal) {
-        $('#slide').empty();
-        var newOptions = JSON.parse(returnVal);
-        var select = $('#slide');
-        $('option', select).remove();
-        $.each(newOptions, function(text, key) {
-          var option = new Option(text, key);
-          select.append($(option));
-        });
-      }      
+      fillSelect($('slide'), slides, function (s) { return s.url; }, function (s) { return s.name; });
+    });
+  }
 
-      // Draft email template parsing function 
-      function buildDraftList(returnVal) {
-        $('#draft').empty();
-        var newOptions = JSON.parse(returnVal);
-        var select = $('#draft');
-        $('option', select).remove();
-        $.each(newOptions, function(text, key) {
-          var option = new Option(key, text);
-          select.append($(option));
-        });
+  function resetRunButton() {
+    confirmPending = false;
+    $('runBtn').disabled = false;
+    $('runBtn').textContent = mode() === 'test' ? 'TEST' : 'RUN';
+  }
+
+  function mode() {
+    return document.querySelector('input[name="mode"]:checked').value;
+  }
+
+  function collect() {
+    return {
+      draftId: $('draft').value,
+      sheetName: $('sheet').value,
+      senderEmail: $('senderEmail').value,
+      senderName: $('senderName').value.trim(),
+      cc: $('cc').value.trim(),
+      bcc: $('bcc').value.trim(),
+      mode: mode(),
+      slideUrl: $('useSlide').checked ? $('slide').value : ''
+    };
+  }
+
+  function send(opts) {
+    $('runBtn').disabled = true;
+    setStatus(opts.mode === 'test' ? '테스트 메일 보내는 중...' : '발송 중... 창을 닫지 마세요.');
+    call('startMailMerge', [opts], function (r) {
+      var msg = '성공 ' + r.sent + ' · 건너뜀 ' + r.skipped + ' · 실패 ' + r.failed;
+      if (r.stoppedEarly) msg += '\n시간 제한으로 멈췄습니다. 남은 ' + r.remaining + '건은 RUN을 다시 누르면 이어서 보냅니다.';
+      if (r.missingFields && r.missingFields.length) msg += '\n시트에 없는 필드: ' + r.missingFields.join(', ');
+      setStatus(msg, r.failed || r.stoppedEarly || (r.missingFields && r.missingFields.length) ? 'warn' : 'ok');
+      resetRunButton();
+    });
+  }
+
+  $('runBtn').addEventListener('click', function () {
+    var opts = collect();
+    if (!opts.draftId) return setStatus('메일 템플릿(초안)을 선택해 주세요.', 'err');
+    if (opts.mode === 'test') return send(opts);
+
+    if (confirmPending) return send(opts);
+
+    // 실제 발송 전 한 번 확인
+    $('runBtn').disabled = true;
+    call('getSendPreview', [opts.sheetName], function (p) {
+      $('runBtn').disabled = false;
+      if (!p.pending) {
+        setStatus('보낼 대상이 없습니다. (이미 발송 ' + p.sent + '건, 주소 오류 ' + p.invalid + '건)\n다시 보내려면 Mail Merge Status 칸의 EMAIL_SENT 를 지우세요.', 'warn');
+        return;
       }
-      
-      // Email account (alias) parsing function
-      function buildsenderEmailList(returnVal) {
-        $('#senderEmail').empty();
-        var newOptions = JSON.parse(returnVal);
-        var select = $('#senderEmail');
-        $('option', select).remove();
-        $.each(newOptions, function(text, key) {
-          var option = new Option(key, text);
-          select.append($(option));
-        });
-      }
-      
-      // Datasheet Parsing Function
-      function buildDataSheetList(returnVal) {
-        $('#datasheet').empty();
-        var newOptions = JSON.parse(returnVal);
-        var select = $('#datasheet');
-        $('option', select).remove();
-        $.each(newOptions, function(text, key) {
-          var option = new Option(key, text);
-          select.append($(option));
-        });
-      } 
-    
-      /**
-       * Inserts a div that contains an status message after a given element.
-       *
-       * @param {String} msg The status message to display.
-       * @param {Object} element The element after which to display the Status.
-       */
-      function showStatus(msg, element) {
-         var div = $("<div style='padding-top:3px'>")
-             .attr('id', 'status')
-             .attr('class','error')
-             .text(msg);
-        $(element).after(div);
-      }    
-    </script> 
-  </body>
+      confirmPending = true;
+      $('runBtn').textContent = p.pending + '명에게 발송';
+      setStatus('발송 대상 ' + p.pending + '명 (이미 발송 ' + p.sent + ', 주소 오류 ' + p.invalid + ')\n버튼을 한 번 더 누르면 발송을 시작합니다.', 'warn');
+    });
+  });
+
+  // 입력값이 바뀌면 확인 상태 해제
+  ['draft', 'sheet', 'senderEmail', 'modeTest', 'modeRun'].forEach(function (id) {
+    $(id).addEventListener('change', function () { resetRunButton(); setStatus(''); });
+  });
+
+  $('senderEmail').addEventListener('change', function () {
+    var s = senders.filter(function (x) { return x.email === $('senderEmail').value; })[0];
+    if (s && s.name) $('senderName').value = s.name;
+  });
+
+  $('reloadDrafts').addEventListener('click', function () {
+    call('getDrafts', [], renderDrafts);
+  });
+
+  $('resetBtn').addEventListener('click', load);
+
+  $('useSlide').addEventListener('change', function () {
+    $('slideBox').className = this.checked ? '' : 'hidden';
+    if (this.checked) loadSlides();
+  });
+
+  $('openSlide').addEventListener('click', function () {
+    if ($('slide').value) window.open($('slide').value, '_blank');
+  });
+
+  $('newSlide').addEventListener('click', function () {
+    setStatus('슬라이드 만드는 중...');
+    call('createSlide', [], function (s) {
+      // 비동기 후 window.open 은 팝업 차단에 걸리므로 목록에 추가하고 '열기'로 안내
+      $('slide').innerHTML = '';
+      fillSelect($('slide'), [s], function (x) { return x.url; }, function (x) { return x.name; });
+      setStatus("새 슬라이드를 만들었습니다. '열기'를 눌러 첫 장에 {{Name}} 등을 넣어 꾸미세요.", 'ok');
+    });
+  });
+
+  load();
+</script>
+</body>
 </html>
