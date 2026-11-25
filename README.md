@@ -50,9 +50,9 @@ Send personalised emails to everyone in a Google Sheet, using a Gmail draft as t
 
 2. **List recipients in a sheet.** Row 1 is the header. The email column must be named `Email` or `Email Address` (`이메일` also works).
 
-   | Company | Name | Email | Mail Merge Status |
-   |---|---|---|---|
-   | Acme | Jane | jane@example.com | |
+   | Company | Name | Email | Mail Merge Status | Mail Merge Sent At |
+   |---|---|---|---|---|
+   | Acme | Jane | jane@example.com | | |
 
 3. **▼Mail Merge▼ → Open Mail Merge**, choose the draft, sheet and From address.
 4. Choose **Send a test email** first and check it in your inbox.
@@ -62,8 +62,10 @@ Send personalised emails to everyone in a Google Sheet, using a Gmail draft as t
 
 | Status | Meaning |
 |---|---|
-| `EMAIL_SENT` | Sent. This row is skipped next time — clear the cell to resend. |
+| `EMAIL_SENT` | Sent. This row is skipped next time — clear the cell to resend. (Case-insensitive: `Email_Sent` also counts.) |
 | `ERROR: …` | Failed, with the reason. Fix it and click RUN again. |
+
+The **`Mail Merge Sent At`** column (created next to the status column) records the time of the last successful send. Test emails don't change the sheet.
 
 ### Slide image (optional)
 

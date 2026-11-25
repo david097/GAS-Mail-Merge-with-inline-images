@@ -35,6 +35,8 @@ Existing sheets keep working: `EMAIL_SENT` statuses and `{{Name}}`-style fields 
 
 - English / Korean UI (`i18n.gs`, `Lang_*.gs`), auto-detected from the Google account language, switchable in the sidebar.
 - Pre-send confirmation showing the number of recipients.
+- `Mail Merge Sent At` column with the time of the last successful send (created next to the status column; never overwrites existing data). Test emails no longer modify the sheet.
+- The `EMAIL_SENT` check ignores case, spaces, `_` and `-` (`Email_Sent`, `email sent` are skipped too).
 - CC field; CC/BCC address validation.
 - Sender name auto-filled from the Gmail "Send mail as" settings and remembered per user.
 - Warning for merge fields that don't exist in the sheet.

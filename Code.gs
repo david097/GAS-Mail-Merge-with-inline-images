@@ -18,6 +18,7 @@ const CONFIG = {
   MENU_NAME: '▼Mail Merge▼',
   STATUS_HEADER: 'Mail Merge Status', // kept in English for compatibility with existing sheets
   STATUS_SENT: 'EMAIL_SENT',
+  SENT_AT_HEADER: 'Mail Merge Sent At', // last successful send time (also kept in English)
   // Headers recognised as the email column (compared after lower-casing and removing spaces/symbols)
   EMAIL_HEADERS: ['email', 'emailaddress', 'mail', 'mailaddress', '이메일', '이메일주소', '메일', '메일주소'],
   MAX_DRAFTS: 20,
@@ -155,7 +156,7 @@ function runMailMerge_(opts) {
   if (!opts.draftId) throw new Error(t('err_no_draft_selected'));
 
   const sheet = getSheet_(opts.sheetName);
-  const table = readTable_(sheet, true);
+  const table = readTable_(sheet, !isTest); // test mode never modifies the sheet
   const template = loadTemplate_(opts.draftId);
   const cc = parseAddressList_(opts.cc, 'CC');
   const bcc = parseAddressList_(opts.bcc, 'BCC');
@@ -224,7 +225,7 @@ function runMailMerge_(opts) {
       });
       withRetry_(() => sendRawMime_(mime));
       summary.sent++;
-      setStatus_(sheet, row, table.statusCol, CONFIG.STATUS_SENT, isTest);
+      markSent_(sheet, row, table, isTest);
       log.push({ type: 'ok', text: isTest ? t('log_test_sent', { to: to, row: row.rowNumber }) : to });
     } catch (e) {
       summary.failed++;
@@ -266,23 +267,62 @@ function getSheet_(name) {
 }
 
 /**
+ * Makes sure the "Mail Merge Status" and "Mail Merge Sent At" columns exist (run mode only).
+ * - Status: appended after the last column if missing.
+ * - Sent At: placed right after Status. If that column already holds data, a new column is
+ *   inserted instead, so existing data is never overwritten. Later runs find it by name.
+ */
+function ensureStatusColumns_(sheet) {
+  const lastCol = Math.max(sheet.getLastColumn(), 1);
+  const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0].map(h => String(h).trim());
+
+  let statusCol = headers.indexOf(CONFIG.STATUS_HEADER) + 1;
+  if (!statusCol) {
+    statusCol = lastCol + 1;
+    ensureColumnExists_(sheet, statusCol);
+    sheet.getRange(1, statusCol).setValue(CONFIG.STATUS_HEADER);
+  }
+
+  if (headers.indexOf(CONFIG.SENT_AT_HEADER) < 0) {
+    const col = statusCol + 1;
+    if (col > sheet.getMaxColumns()) {
+      sheet.insertColumnAfter(statusCol);
+    } else {
+      const rows = Math.max(sheet.getLastRow(), 1);
+      const used = sheet.getRange(1, col, rows, 1).getDisplayValues().some(r => String(r[0]).trim() !== '');
+      if (used) sheet.insertColumnAfter(statusCol);
+    }
+    sheet.getRange(1, col).setValue(CONFIG.SENT_AT_HEADER);
+  }
+}
+
+function ensureColumnExists_(sheet, col) {
+  const max = sheet.getMaxColumns();
+  if (col > max) sheet.insertColumnsAfter(max, col - max);
+}
+
+/**
  * Reads the sheet into row objects.
  * - Keeps the real sheet row number, so statuses land on the right row even with blank rows.
  * - Uses getDisplayValues so dates and numbers appear exactly as formatted in the sheet.
+ * - The status / sent-at columns are not available as merge fields.
  */
-function readTable_(sheet, createStatusColumn) {
+function readTable_(sheet, createStatusColumns) {
+  if (sheet.getLastRow() < 1 || sheet.getLastColumn() < 1) {
+    throw new Error(t('err_sheet_empty', { name: sheet.getName() }));
+  }
+  if (createStatusColumns) ensureStatusColumns_(sheet);
+
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
-  if (lastRow < 1 || lastCol < 1) throw new Error(t('err_sheet_empty', { name: sheet.getName() }));
-
   const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0].map(h => String(h).trim());
 
   let statusIdx = headers.indexOf(CONFIG.STATUS_HEADER);
-  if (statusIdx < 0) {
+  if (statusIdx < 0) { // preview only: the column doesn't exist yet
     statusIdx = headers.length;
     headers.push(CONFIG.STATUS_HEADER);
-    if (createStatusColumn) sheet.getRange(1, statusIdx + 1).setValue(CONFIG.STATUS_HEADER);
   }
+  const sentAtIdx = headers.indexOf(CONFIG.SENT_AT_HEADER);
 
   const emailIdx = headers.findIndex(h => CONFIG.EMAIL_HEADERS.indexOf(normalizeKey_(h)) >= 0);
   if (emailIdx < 0) throw new Error(t('err_no_email_column'));
@@ -294,7 +334,7 @@ function readTable_(sheet, createStatusColumn) {
       if (cells.every(c => String(c).trim() === '')) return; // skip completely empty rows
       const pairs = [];
       headers.forEach((h, c) => {
-        if (h && c !== statusIdx) pairs.push([h, String(cells[c])]);
+        if (h && c !== statusIdx && c !== sentAtIdx) pairs.push([h, String(cells[c])]);
       });
       rows.push({
         rowNumber: i + 2,
@@ -305,7 +345,7 @@ function readTable_(sheet, createStatusColumn) {
       });
     });
   }
-  return { headers: headers, rows: rows, statusCol: statusIdx + 1 };
+  return { headers: headers, rows: rows, statusCol: statusIdx + 1, sentAtCol: sentAtIdx + 1 };
 }
 
 /**
@@ -320,6 +360,15 @@ function isSentStatus_(value) {
 function setStatus_(sheet, row, statusCol, text, isTest) {
   if (isTest) return;
   sheet.getRange(row.rowNumber, statusCol).setValue(String(text).slice(0, 300));
+}
+
+/** Marks a row as sent and records the send time (success only; never in test mode). */
+function markSent_(sheet, row, table, isTest) {
+  if (isTest) return;
+  setStatus_(sheet, row, table.statusCol, CONFIG.STATUS_SENT, false);
+  if (table.sentAtCol > 0) {
+    sheet.getRange(row.rowNumber, table.sentAtCol).setValue(new Date()).setNumberFormat('yyyy-mm-dd hh:mm:ss');
+  }
 }
 
 /* ======================================================================
