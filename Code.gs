@@ -285,12 +285,17 @@ function startMailMerge (draft, sheetName, senderEmail, senderName, ccEmail, bcc
     htmlBody: emailText,
     subject: "[TEST] " + emailSubject,
     name: senderName,
+    replyTo: senderEmail,
     from: senderEmail,
     "attachments": attachments,
     "inlineImages": inlineImages
   }
-    
-  MailApp.sendEmail(UserEmail, "[TEST] " + emailSubject, null, message);
+  
+  
+  // 2023년 11월 15일 수정 업데이트
+  // https://developers.google.com/apps-script/reference/gmail/gmail-app?hl=ko // sender email 셋팅이 안되어서 이 링크 참고하여 MailApp.sendEmail에서 => GamilApp.sendEmail 함수로 바꿈
+    GmailApp.sendEmail(UserEmail, "[TEST] " + emailSubject, null, message);
+    //MailApp.sendEmail(UserEmail, "[TEST] " + emailSubject, null, message); //원코드
     
     output.append("<span style='color:blue'>Sent test a email to " + UserEmail + "</span><br/>");
     output.append("<br/>======= FINISH : " + Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), dateFormat) + " =======</div>");
@@ -318,9 +323,14 @@ function startMailMerge (draft, sheetName, senderEmail, senderName, ccEmail, bcc
      inlineImages["slideImage"] = slideImageBlob.blob.setName("slideImage");
      }
      ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-         
-     MailApp.sendEmail(rowData.email, emailSubject, null,
-                        {name: senderName, attachments: attachments, htmlBody: emailText, cc: cc, bcc: bcc, inlineImages:inlineImages, from : senderEmail});
+
+  // 2023년 11월 15일 수정 업데이트
+  // https://developers.google.com/apps-script/reference/gmail/gmail-app?hl=ko // sender email 셋팅이 안되어서 이 링크 참고하여 MailApp.sendEmail에서 => GamilApp.sendEmail 함수로 바꿈
+    
+     GmailApp.sendEmail(rowData.email, emailSubject, null,
+                        {name: senderName, attachments: attachments, htmlBody: emailText, cc: cc, bcc: bcc, inlineImages:inlineImages, replyTo: senderEmail,from : senderEmail});
+     //MailApp.sendEmail(rowData.email, emailSubject, null,
+     //                   {name: senderName, attachments: attachments, htmlBody: emailText, cc: cc, bcc: bcc, inlineImages:inlineImages, replyTo: senderEmail,from : senderEmail});
 
      dataSheet.getRange(i+2,dataSheet.getLastColumn()).setValue("EMAIL_SENT");
      output.append ("<span style='color:blue'>Success</span> : " + rowData.email + " <br/>");
